@@ -45,6 +45,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 
 [[package]]
+name = "bsp-path-finding"
+version = "0.1.0"
+dependencies = [
+ "macroquad",
+ "slotmap",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -283,14 +291,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13e571c3517af9e1729d4c63571a27edd660ade0667973bfc74a67c660c2b651"
 dependencies = [
  "byteorder",
-]
-
-[[package]]
-name = "path-finding"
-version = "0.1.0"
-dependencies = [
- "macroquad",
- "slotmap",
 ]
 
 [[package]]
