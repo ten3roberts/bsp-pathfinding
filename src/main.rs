@@ -1,15 +1,34 @@
 use macroquad::prelude::*;
+use path_finding::{Shape, World};
 
-#[macroquad::main("BasicShapes")]
+const WIDTH: i32 = 800;
+const HEIGHT: i32 = 600;
+
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Runtime path finding using Binary Spatial Partitioning".to_owned(),
+        fullscreen: false,
+        window_width: WIDTH,
+        window_height: HEIGHT,
+        ..Default::default()
+    }
+}
+#[macroquad::main(window_conf)]
 async fn main() {
+    let rect1 = Shape::rect(Vec2::new(200.0, 100.0), Vec2::new(200.0, 300.0));
+    let rect2 = Shape::rect(Vec2::new(50.0, 200.0), Vec2::new(275.0, 450.0));
+    let tri = Shape::new(&[
+        Vec2::new(600.0, 100.0),
+        Vec2::new(650.0, 200.0),
+        Vec2::new(500.0, 200.0),
+    ]);
+
+    let world = World::new(&[rect1, rect2, tri]);
+
     loop {
-        clear_background(RED);
+        clear_background(WHITE);
 
-        draw_line(40.0, 40.0, 100.0, 200.0, 15.0, BLUE);
-        draw_rectangle(screen_width() / 2.0 - 60.0, 100.0, 120.0, 60.0, GREEN);
-        draw_circle(screen_width() - 30.0, screen_height() - 30.0, 15.0, YELLOW);
-
-        draw_text("IT WORKS!", 20.0, 20.0, 30.0, DARKGRAY);
+        world.draw(3.0);
 
         next_frame().await
     }
