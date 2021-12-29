@@ -1,5 +1,7 @@
 use macroquad::prelude::{draw_line, Vec2, BLACK, BLUE};
 
+use crate::TOLERANCE;
+
 /// Defines a 2d shape
 #[derive(Default, Debug, Clone)]
 pub struct Shape {
@@ -37,8 +39,8 @@ impl Shape {
 
     pub fn draw(&self, thickness: f32) {
         for face in self.faces() {
-            let a = self.vertices[face.indices[1]];
-            let b = self.vertices[face.indices[0]];
+            let a = face.vertices[1];
+            let b = face.vertices[0];
 
             let normal = face.normal();
 
@@ -56,20 +58,52 @@ impl Shape {
     }
 }
 
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct Face {
-    normal: Vec2,
-    indices: [usize; 2],
+    pub normal: Vec2,
+    pub vertices: [Vec2; 2],
 }
 
 impl Face {
-    /// Get the face's indices.
-    pub fn indices(&self) -> [usize; 2] {
-        self.indices
+    pub fn new(vertices: [Vec2; 2]) -> Self {
+        let dir = (vertices[1] - vertices[0]).normalize();
+        let normal = Vec2::new(dir.y, -dir.x);
+        Self { normal, vertices }
+    }
+
+    /// Get the face's vertices.
+    pub fn vertices(&self) -> [Vec2; 2] {
+        self.vertices
     }
 
     /// Get the face's normal.
     pub fn normal(&self) -> Vec2 {
         self.normal
+    }
+
+    /// Returns the side self is in respect to `face`
+    pub fn side_of(&self, face: &Face) -> Side {
+        let p = face.vertices[0];
+        let a = (p - self.vertices[0]).dot(face.normal);
+        let b = (p - self.vertices[1]).dot(face.normal);
+
+        if a.abs() < TOLERANCE && b.abs() < TOLERANCE {
+            Side::Coplanar
+        } else if a >= 0.0 && b >= 0.0 {
+            Side::Front
+        } else if a <= 0.0 && b <= 0.0 {
+            Side::Back
+        } else {
+            Side::Intersecting
+        }
+    }
+
+    /// Splits the face around `p`
+    pub fn split(&self, p: Vec2) -> [Self; 2] {
+        [
+            Face::new([p, self.vertices[0]]),
+            Face::new([self.vertices[1], p]),
+        ]
     }
 }
 
@@ -88,18 +122,11 @@ impl<'a> Iterator for Faces<'a> {
             return None;
         }
 
-        let a = self.current;
-        let b = (self.current + 1) % self.len;
-
-        let dir = (self.vertices[b] - self.vertices[a]).normalize();
-        let normal = Vec2::new(dir.y, -dir.x);
+        let a = self.vertices[self.current];
+        let b = self.vertices[(self.current + 1) % self.len];
 
         self.current += 1;
-
-        Some(Face {
-            normal,
-            indices: [a, b],
-        })
+        Some(Face::new([a, b]))
     }
 }
 
@@ -122,4 +149,12 @@ mod tests {
             .inspect(|val| eprintln!("Normal: {:?}", val))
             .eq(normals));
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub enum Side {
+    Front,
+    Back,
+    Coplanar,
+    Intersecting,
 }

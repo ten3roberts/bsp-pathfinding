@@ -1,5 +1,5 @@
 use macroquad::prelude::*;
-use path_finding::{Shape, World};
+use path_finding::{BSPTree, Shape, World};
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 600;
@@ -25,8 +25,12 @@ async fn main() {
 
     let world = World::new(&[rect1, rect2, tri]);
 
+    let tree = BSPTree::new(&world).expect("Existent faces");
+
     loop {
         clear_background(WHITE);
+
+        tree.draw(10.0);
 
         world.draw(3.0);
 

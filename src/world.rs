@@ -1,3 +1,5 @@
+use std::slice;
+
 use crate::Shape;
 
 /// Represents the navigable world or scene
@@ -28,5 +30,10 @@ impl World {
         for shape in &self.shapes {
             shape.draw(thickness);
         }
+    }
+
+    /// Iterate all shapes
+    pub fn shapes(&self) -> slice::Iter<Shape> {
+        self.shapes.iter()
     }
 }
