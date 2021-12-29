@@ -1,7 +1,4 @@
-use macroquad::{
-    color::hsl_to_rgb,
-    prelude::{draw_circle, draw_line, Color, Vec2, BLUE},
-};
+use macroquad::prelude::{draw_circle, draw_line, Color, Vec2, BLUE};
 
 use crate::{util::line_intersect, Face, Side};
 
@@ -145,11 +142,4 @@ impl BSPNode {
     //         coplanar,
     //     }
     // }
-}
-
-#[derive(Default, Debug)]
-struct Partitioned {
-    front: Option<NodeIndex>,
-    back: Option<NodeIndex>,
-    coplanar: Vec<Vec2>,
 }

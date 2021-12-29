@@ -1,5 +1,5 @@
+use bsp_path_finding::{BSPTree, Shape, World};
 use macroquad::prelude::*;
-use path_finding::{BSPTree, Shape, World};
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 600;
