@@ -1,6 +1,6 @@
-use macroquad::prelude::{draw_circle, draw_line, Color, Vec2, BLUE};
+use glam::Vec2;
 
-use crate::{util::line_intersect, Face, Side};
+use crate::{util::line_intersect, Face, Side, TOLERANCE};
 
 use super::{NodeIndex, Nodes};
 
@@ -71,75 +71,71 @@ impl BSPNode {
         Some(nodes.insert(node))
     }
 
-    pub(crate) fn draw(index: NodeIndex, nodes: &Nodes, thickness: f32, depth: usize) {
-        let node = &nodes[index];
+    pub fn get_side(&self, point: Vec2) -> Side {
+        let dot = (point - self.origin).dot(self.normal());
 
-        let dir = Vec2::new(node.normal.y, -node.normal.x);
-        let p = node.origin - dir * 100.0;
-        let q = node.origin + dir * 100.0;
-
-        let bright = depth as f32 * 0.1;
-
-        draw_line(
-            p.x,
-            p.y,
-            q.x,
-            q.y,
-            thickness,
-            Color::new(bright, bright, bright, 1.0), // hsl_to_rgb(depth as f32 * 0.02, 1.0, 0.5),
-        );
-
-        for vertex in &node.vertices {
-            draw_circle(vertex.x, vertex.y, thickness, BLUE);
-        }
-
-        if let Some(front) = node.front {
-            Self::draw(front, nodes, thickness, depth + 1)
-        }
-        if let Some(back) = node.back {
-            Self::draw(back, nodes, thickness, depth + 1)
+        if dot.abs() < TOLERANCE {
+            Side::Coplanar
+        } else if dot <= 0.0 {
+            Side::Back
+        } else {
+            Side::Front
         }
     }
 
-    // /// It doesn't suffice to use slice::group or itertools::group_by since
-    // /// mutable access is required.
-    // fn partition(nodes: &mut Nodes, faces: &mut [(Side, Face)]) -> Partitioned {
-    //     let mut side = match faces.get(0) {
-    //         Some(val) => val.0,
-    //         None => return Partitioned::default(),
-    //     };
+    /// Get the bspnode's front.
+    pub fn front(&self) -> Option<NodeIndex> {
+        self.front
+    }
 
-    //     let mut front = None;
+    /// Get the bspnode's back.
+    pub fn back(&self) -> Option<NodeIndex> {
+        self.back
+    }
 
-    //     let mut back = None;
-    //     let mut coplanar = Vec::new();
+    /// Get a reference to the bspnode's vertices.
+    pub fn vertices(&self) -> &[Vec2] {
+        self.vertices.as_ref()
+    }
 
-    //     let mut start = 0;
+    /// Get the bspnode's normal.
+    pub fn normal(&self) -> Vec2 {
+        self.normal
+    }
 
-    //     for i in 1..faces.len() {
-    //         let new_side = faces[i].0;
+    /// Get the bspnode's origin.
+    pub fn origin(&self) -> Vec2 {
+        self.origin
+    }
 
-    //         // Break group
-    //         if new_side != side || i != faces.len() - 1 {
-    //             let faces = &mut faces[start..i];
+    pub fn descendants<'a>(index: NodeIndex, nodes: &'a Nodes) -> DescendantsIter<'a> {
+        DescendantsIter {
+            nodes,
+            stack: vec![index],
+        }
+    }
+}
 
-    //             match side {
-    //                 Side::Front => front = Self::new(nodes, faces),
-    //                 Side::Back => back = Self::new(nodes, faces),
-    //                 Side::Coplanar => coplanar.extend(faces.iter().flat_map(|val| val.1.vertices)),
-    //                 Side::Intersecting => todo!(),
-    //             }
+pub struct DescendantsIter<'a> {
+    nodes: &'a Nodes,
 
-    //             // Get new group
-    //             side = new_side;
-    //             start = i;
-    //         }
-    //     }
+    stack: Vec<NodeIndex>,
+}
 
-    //     Partitioned {
-    //         front,
-    //         back,
-    //         coplanar,
-    //     }
-    // }
+impl<'a> Iterator for DescendantsIter<'a> {
+    type Item = (NodeIndex, &'a BSPNode);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let index = self.stack.pop()?;
+
+        let node = &self.nodes[index];
+        if let Some(front) = node.front {
+            self.stack.push(front)
+        }
+        if let Some(back) = node.back {
+            self.stack.push(back)
+        }
+
+        Some((index, node))
+    }
 }

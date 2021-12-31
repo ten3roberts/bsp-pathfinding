@@ -1,0 +1,5 @@
+{
+  "build": "cargo build --examples",
+  "run": "cargo run --example demo",
+  "check": "cargo check --examples"
+}

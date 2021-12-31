@@ -1,4 +1,4 @@
-use macroquad::prelude::{draw_line, Vec2, BLACK, BLUE};
+use glam::Vec2;
 
 use crate::TOLERANCE;
 
@@ -7,8 +7,6 @@ use crate::TOLERANCE;
 pub struct Shape {
     vertices: Vec<Vec2>,
 }
-
-const NORMAL_LENGTH: f32 = 30.0;
 
 impl Shape {
     pub fn new(vertices: &[Vec2]) -> Self {
@@ -34,26 +32,6 @@ impl Shape {
             vertices: &self.vertices,
             current: 0,
             len: self.vertices.len(),
-        }
-    }
-
-    pub fn draw(&self, thickness: f32) {
-        for face in self.faces() {
-            let a = face.vertices[1];
-            let b = face.vertices[0];
-
-            let normal = face.normal();
-
-            draw_line(a.x, a.y, b.x, b.y, thickness, BLACK);
-            let mid = (a + b) / 2.0;
-            draw_line(
-                mid.x,
-                mid.y,
-                mid.x + normal.x * NORMAL_LENGTH,
-                mid.y + normal.y * NORMAL_LENGTH,
-                thickness,
-                BLUE,
-            )
         }
     }
 }
@@ -132,7 +110,7 @@ impl<'a> Iterator for Faces<'a> {
 
 #[cfg(test)]
 mod tests {
-    use macroquad::prelude::Vec2;
+    use glam::Vec2;
 
     use super::Shape;
 

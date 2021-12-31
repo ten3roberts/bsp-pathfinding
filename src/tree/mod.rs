@@ -1,8 +1,8 @@
 use slotmap::*;
 
-use crate::World;
+use crate::Face;
 
-use self::node::BSPNode;
+pub use node::{BSPNode, DescendantsIter};
 
 mod node;
 
@@ -20,8 +20,8 @@ pub struct BSPTree {
 impl BSPTree {
     /// Constructs a new tree.
     /// Returns None if there are not faces, and root construction was not possible
-    pub fn new(world: &World) -> Option<Self> {
-        let faces: Vec<_> = world.shapes().flat_map(|shape| shape.faces()).collect();
+    pub fn new(faces: impl Iterator<Item = Face>) -> Option<Self> {
+        let faces: Vec<_> = faces.collect();
 
         let mut nodes = SlotMap::with_key();
         let root = BSPNode::new(&mut nodes, &faces)?;
@@ -29,8 +29,21 @@ impl BSPTree {
         Some(Self { nodes, root })
     }
 
-    /// Draws the tree
-    pub fn draw(&self, thickness: f32) {
-        BSPNode::draw(self.root, &self.nodes, thickness, 0);
+    pub fn node(&self, index: NodeIndex) -> Option<&BSPNode> {
+        self.nodes.get(index)
+    }
+
+    /// Returns the root index
+    pub fn root(&self) -> NodeIndex {
+        self.root
+    }
+
+    /// Returns a reference to the root node
+    pub fn root_node(&self) -> &BSPNode {
+        self.node(self.root).expect("Root is always present")
+    }
+
+    pub fn descendants(&self) -> DescendantsIter {
+        BSPNode::descendants(self.root, &self.nodes)
     }
 }

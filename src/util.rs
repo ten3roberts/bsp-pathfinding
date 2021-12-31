@@ -1,4 +1,4 @@
-use macroquad::prelude::Vec2;
+use glam::Vec2;
 
 /// Returns the intersection points between two lines
 pub fn line_intersect(a: (Vec2, Vec2), b: (Vec2, Vec2)) -> Vec2 {
