@@ -82,8 +82,8 @@ impl Face {
     /// Returns the side self is in respect to `face`
     pub fn side_of(&self, face: &Face) -> Side {
         let p = face.vertices[0];
-        let a = (p - self.vertices[0]).dot(face.normal);
-        let b = (p - self.vertices[1]).dot(face.normal);
+        let a = (self.vertices[0] - p).dot(face.normal);
+        let b = (self.vertices[1] - p).dot(face.normal);
 
         if a.abs() < TOLERANCE && b.abs() < TOLERANCE {
             Side::Coplanar
@@ -102,6 +102,10 @@ impl Face {
             Face::new([p, self.vertices[0]]),
             Face::new([self.vertices[1], p]),
         ]
+    }
+
+    pub fn midpoint(&self) -> Vec2 {
+        (self.vertices[0] + self.vertices[1]) / 2.0
     }
 }
 

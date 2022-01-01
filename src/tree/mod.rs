@@ -2,8 +2,10 @@ use slotmap::*;
 
 use crate::Face;
 
+pub use edges::Edges;
 pub use node::{BSPNode, DescendantsIter};
 
+mod edges;
 mod node;
 
 type Nodes = SlotMap<NodeIndex, BSPNode>;
@@ -56,5 +58,9 @@ impl BSPTree {
 
     pub fn descendants(&self) -> DescendantsIter {
         BSPNode::descendants(self.root, &self.nodes)
+    }
+
+    pub fn generate_edges(&self) -> Edges {
+        Edges::new(self.root, &self.nodes)
     }
 }

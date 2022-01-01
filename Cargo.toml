@@ -11,6 +11,7 @@ license-file = "LICENSE"
 glam = "0.14"
 ordered-float = "2.8.0"
 slotmap = "1.0.6"
+smallvec = "1.7.0"
 
 [dev-dependencies]
 macroquad = "0.3.13"
