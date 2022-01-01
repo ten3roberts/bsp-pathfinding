@@ -83,14 +83,6 @@ impl Edges {
                 }
             }
         }
-
-        // if let Some(val) = child.front() {
-        //     self.construct_for_node(index, node, val, nodes);
-        // }
-
-        // if let Some(val) = child.back() {
-        //     self.construct_for_node(index, node, val, nodes);
-        // }
     }
 
     /// Adds a two way edge
@@ -132,6 +124,7 @@ impl Edge {
     }
 
     /// Get the edge's origins.
+    /// Used for visualization purposes
     pub fn origins(&self) -> [Vec2; 2] {
         self.origins
     }

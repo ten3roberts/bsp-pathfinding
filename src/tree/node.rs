@@ -6,10 +6,7 @@ use crate::{
     Face, Side, TOLERANCE,
 };
 
-use super::{
-    edges::{Edge, NodeEdges},
-    NodeIndex, Nodes,
-};
+use super::{NodeIndex, Nodes};
 
 pub struct BSPNode {
     origin: Vec2,

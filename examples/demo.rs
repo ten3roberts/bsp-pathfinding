@@ -1,4 +1,4 @@
-use bsp_path_finding::{BSPNode, BSPTree, Edges, Face, Shape};
+use bsp_path_finding::{BSPNode, BSPTree, Edge, Edges, Face, Shape};
 use macroquad::{color::hsl_to_rgb, prelude::*};
 
 const WIDTH: i32 = 800;
@@ -8,6 +8,7 @@ struct Colorscheme {
     background: Color,
     edge: Color,
     shape: Color,
+    start: Color,
     bsp_plane: fn(usize) -> Color,
 }
 
@@ -16,7 +17,8 @@ const DARK_COLORSCHEME: Colorscheme = Colorscheme {
     background: BLACK,
     edge: DARKPURPLE,
     shape: WHITE,
-    bsp_plane: |depth| hsl_to_rgb(depth as f32 / 6.0, 1.0, 0.5),
+    start: DARKGREEN,
+    bsp_plane: |depth| hsl_to_rgb(depth as f32 / 8.0, 1.0, 0.5),
 };
 
 #[allow(dead_code)]
@@ -24,7 +26,8 @@ const LIGHT_COLORSCHEME: Colorscheme = Colorscheme {
     background: WHITE,
     edge: DARKPURPLE,
     shape: BLACK,
-    bsp_plane: |depth| hsl_to_rgb(depth as f32 / 6.0, 1.0, 0.5),
+    start: DARKGREEN,
+    bsp_plane: |depth| hsl_to_rgb(depth as f32 / 8.0, 1.0, 0.5),
 };
 
 #[allow(dead_code)]
@@ -32,7 +35,8 @@ const GRAYSCALE: Colorscheme = Colorscheme {
     background: WHITE,
     edge: GRAY,
     shape: BLACK,
-    bsp_plane: |depth| hsl_to_rgb(1.0, 0.0, depth as f32 / 6.0),
+    bsp_plane: |depth| hsl_to_rgb(1.0, 0.0, (depth as f32 / 8.0).min(0.9)),
+    start: BLACK,
 };
 
 const COLORSCHEME: Colorscheme = GRAYSCALE;
@@ -75,7 +79,9 @@ async fn main() {
     ]);
 
     let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 400.0));
-    let poly2 = Shape::regular_polygon(3, 80.0, Vec2::new(200.0, 100.0));
+    let poly2 = Shape::regular_polygon(3, 50.0, Vec2::new(200.0, 100.0));
+
+    let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
 
     let corners = [
         Vec2::new(0.0, screen_height() - 0.0),
@@ -103,8 +109,22 @@ async fn main() {
     loop {
         clear_background(COLORSCHEME.background);
 
-        tree.draw();
-        edges.draw();
+        if is_mouse_button_down(MouseButton::Left) {
+            let pos = mouse_position().into();
+
+            start = pos;
+        }
+
+        draw_circle(start.x, start.y, POINT_RADIUS, COLORSCHEME.start);
+
+        let node = tree.containing_node(start);
+        if !node.covered() {
+            node.node().draw();
+            edges.get(node.index()).unwrap().draw()
+        }
+
+        // tree.draw();
+        // edges.draw();
         world.draw();
 
         next_frame().await
@@ -112,6 +132,8 @@ async fn main() {
 }
 
 const THICKNESS: f32 = 3.0;
+const POINT_RADIUS: f32 = 10.0;
+const VERTEX_RADIUS: f32 = 8.0;
 const EDGE_THICKNESS: f32 = 4.0;
 const NORMAL_LEN: f32 = 32.0;
 const ARROW_LEN: f32 = 8.0;
@@ -179,8 +201,24 @@ impl Draw for BSPNode {
 impl Draw for Edges {
     fn draw(&self) {
         for edge in self.iter().flatten() {
-            let [p, q] = edge.origins();
-            draw_line_dotted(p, q, EDGE_THICKNESS, COLORSCHEME.edge);
+            edge.draw()
         }
+    }
+}
+
+impl Draw for [Edge] {
+    fn draw(&self) {
+        for val in self {
+            val.draw()
+        }
+    }
+}
+
+impl Draw for Edge {
+    fn draw(&self) {
+        let [p, q] = self.origins();
+        let pos = self.pos();
+        draw_circle(pos.x, pos.y, VERTEX_RADIUS, COLORSCHEME.edge);
+        draw_line_dotted(p, q, EDGE_THICKNESS, COLORSCHEME.edge);
     }
 }

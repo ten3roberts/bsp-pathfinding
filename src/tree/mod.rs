@@ -1,9 +1,10 @@
+use glam::Vec2;
 use slotmap::*;
 
 use crate::Face;
 
-pub use edges::Edges;
-pub use node::{BSPNode, DescendantsIter};
+pub use edges::*;
+pub use node::*;
 
 mod edges;
 mod node;
@@ -62,5 +63,54 @@ impl BSPTree {
 
     pub fn generate_edges(&self) -> Edges {
         Edges::new(self.root, &self.nodes)
+    }
+
+    /// Returns the containing node and if the point is covered
+    pub fn containing_node(&self, point: Vec2) -> NodePayload {
+        let mut index = self.root;
+
+        loop {
+            let node = &self.nodes[index];
+            let rel = point - node.origin();
+
+            let (next, covered) = if rel.dot(node.normal()) > 0.0 {
+                (node.front(), false)
+            } else {
+                (node.back(), true)
+            };
+
+            if let Some(next) = next {
+                index = next
+            } else {
+                return NodePayload {
+                    index,
+                    node,
+                    covered,
+                };
+            }
+        }
+    }
+}
+
+pub struct NodePayload<'a> {
+    index: NodeIndex,
+    node: &'a BSPNode,
+    covered: bool,
+}
+
+impl<'a> NodePayload<'a> {
+    /// Get the node payload's node.
+    pub fn node(&self) -> &BSPNode {
+        self.node
+    }
+
+    /// Get the node payload's index.
+    pub fn index(&self) -> NodeIndex {
+        self.index
+    }
+
+    /// Get the node payload's covered.
+    pub fn covered(&self) -> bool {
+        self.covered
     }
 }
