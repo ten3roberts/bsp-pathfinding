@@ -13,3 +13,15 @@ pub fn line_intersect(a: (Vec2, Vec2), b: (Vec2, Vec2)) -> Vec2 {
 
     p
 }
+
+/// Returns the intersection point between two lines as a measure of the length
+/// along b
+pub fn line_intersect_dir(a: (Vec2, Vec2), b: Vec2, b_dir: Vec2) -> f32 {
+    let a_dir = (a.1 - a.0).normalize_or_zero();
+    let rel = b - a.0;
+    let dot = a_dir.perp_dot(b_dir);
+    // project rel onto plane defined by a
+    let length = rel.perp_dot(a_dir);
+
+    length / dot
+}

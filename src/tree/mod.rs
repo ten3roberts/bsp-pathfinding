@@ -24,7 +24,18 @@ impl BSPTree {
         let faces: Vec<_> = faces.collect();
 
         let mut nodes = SlotMap::with_key();
-        let root = BSPNode::new(&mut nodes, &faces)?;
+        let root = BSPNode::new(&mut nodes, &faces, None, 0)?;
+
+        Some(Self { nodes, root })
+    }
+
+    /// Constructs a new tree.
+    /// Returns None if there are not faces, and root construction was not possible
+    pub fn with_bounds(faces: impl Iterator<Item = Face>, bounds: &[Face]) -> Option<Self> {
+        let faces: Vec<_> = faces.collect();
+
+        let mut nodes = SlotMap::with_key();
+        let root = BSPNode::new(&mut nodes, &faces, Some(bounds.to_vec()), 0)?;
 
         Some(Self { nodes, root })
     }

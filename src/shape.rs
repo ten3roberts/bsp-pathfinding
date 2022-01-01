@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use glam::Vec2;
 
 use crate::TOLERANCE;
@@ -13,6 +15,20 @@ impl Shape {
         Self {
             vertices: vertices.to_vec(),
         }
+    }
+
+    pub fn regular_polygon(sides: usize, radius: f32, origin: Vec2) -> Self {
+        let turn = TAU / sides as f32;
+        let vertices = (0..sides)
+            .map(|val| {
+                let x = (turn * val as f32).cos();
+                let y = (turn * val as f32).sin();
+
+                Vec2::new(x, y) * radius + origin
+            })
+            .collect();
+
+        Self { vertices }
     }
 
     pub fn rect(size: Vec2, origin: Vec2) -> Self {
@@ -54,6 +70,10 @@ impl Face {
         self.vertices
     }
 
+    pub fn into_tuple(&self) -> (Vec2, Vec2) {
+        (self.vertices[0], self.vertices[1])
+    }
+
     /// Get the face's normal.
     pub fn normal(&self) -> Vec2 {
         self.normal
@@ -67,9 +87,9 @@ impl Face {
 
         if a.abs() < TOLERANCE && b.abs() < TOLERANCE {
             Side::Coplanar
-        } else if a >= 0.0 && b >= 0.0 {
+        } else if a >= -TOLERANCE && b >= -TOLERANCE {
             Side::Front
-        } else if a <= 0.0 && b <= 0.0 {
+        } else if a <= TOLERANCE && b <= TOLERANCE {
             Side::Back
         } else {
             Side::Intersecting

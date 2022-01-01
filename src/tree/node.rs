@@ -1,6 +1,10 @@
 use glam::Vec2;
+use ordered_float::OrderedFloat;
 
-use crate::{util::line_intersect, Face, Side, TOLERANCE};
+use crate::{
+    util::{line_intersect, line_intersect_dir},
+    Face, Side, TOLERANCE,
+};
 
 use super::{NodeIndex, Nodes};
 
@@ -12,12 +16,22 @@ pub struct BSPNode {
     back: Option<NodeIndex>,
 
     vertices: Vec<Vec2>,
+
+    /// Represents how far the line extends, for visualization purposes
+    bounds: Option<[Vec2; 2]>,
+
+    depth: usize,
 }
 
 impl BSPNode {
     /// Creates a new BSPNode and inserts it into nodes.
     /// Returns None if there were not faces to create a node from
-    pub fn new(nodes: &mut Nodes, faces: &[Face]) -> Option<NodeIndex> {
+    pub fn new(
+        nodes: &mut Nodes,
+        faces: &[Face],
+        mut bounds: Option<Vec<Face>>,
+        depth: usize,
+    ) -> Option<NodeIndex> {
         let (current, faces) = faces.split_first()?;
         let mut vertices: Vec<_> = faces.iter().flat_map(|val| val.vertices).collect();
 
@@ -56,16 +70,49 @@ impl BSPNode {
             }
         }
 
-        let front = Self::new(nodes, &mut front);
-        let back = Self::new(nodes, &mut back);
+        let [p, q] = current.vertices();
+        let dir = (p - q).normalize();
+
+        // Calculate how long this partition reaches. This is only used for
+        // visualization purposes, and does nothing if `None` is passed
+        let min = bounds
+            .iter()
+            .flatten()
+            .map(|bound| line_intersect_dir(bound.into_tuple(), p, -dir))
+            .filter(|val| val.is_finite() && *val > TOLERANCE)
+            .min_by_key(|val| OrderedFloat(*val));
+
+        let max = bounds
+            .iter()
+            .flatten()
+            .map(|bound| line_intersect_dir(bound.into_tuple(), q, dir))
+            .filter(|val| val.is_finite() && *val > TOLERANCE)
+            .min_by_key(|val| OrderedFloat(val.abs()));
+
+        let (origin, node_bounds) = if let (Some(min), Some(max)) = (min, max) {
+            let a = p - dir * min;
+            let b = q + dir * max;
+            ((a + b) / 2.0, Some([a, b]))
+        } else {
+            (current.vertices[0], None)
+        };
+
+        if let Some(bounds) = bounds.as_mut() {
+            bounds.push(*current)
+        }
+
+        let front = Self::new(nodes, &mut front, bounds.clone(), depth + 1);
+        let back = Self::new(nodes, &mut back, bounds.clone(), depth + 1);
 
         let node = Self {
             // Any point will do
-            origin: current.vertices[0],
+            origin,
             normal: current.normal,
             front,
             back,
             vertices,
+            bounds: node_bounds,
+            depth,
         };
 
         Some(nodes.insert(node))
@@ -113,6 +160,16 @@ impl BSPNode {
             nodes,
             stack: vec![index],
         }
+    }
+
+    /// Get the bspnode's bounds.
+    pub fn bounds(&self) -> Option<[Vec2; 2]> {
+        self.bounds
+    }
+
+    /// Get the bspnode's depth.
+    pub fn depth(&self) -> usize {
+        self.depth
     }
 }
 
