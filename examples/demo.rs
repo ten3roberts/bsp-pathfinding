@@ -1,4 +1,7 @@
-use bsp_path_finding::{BSPNode, BSPTree, Edge, Edges, Face, Shape};
+use bsp_path_finding::{
+    astar::{astar, Path},
+    BSPNode, BSPTree, Edge, Edges, Face, Shape,
+};
 use macroquad::{color::hsl_to_rgb, prelude::*};
 
 const WIDTH: i32 = 800;
@@ -9,6 +12,8 @@ struct Colorscheme {
     edge: Color,
     shape: Color,
     start: Color,
+    path: Color,
+    end: Color,
     bsp_plane: fn(usize) -> Color,
 }
 
@@ -18,6 +23,8 @@ const DARK_COLORSCHEME: Colorscheme = Colorscheme {
     edge: DARKPURPLE,
     shape: WHITE,
     start: DARKGREEN,
+    end: RED,
+    path: BLUE,
     bsp_plane: |depth| hsl_to_rgb(depth as f32 / 8.0, 1.0, 0.5),
 };
 
@@ -27,6 +34,8 @@ const LIGHT_COLORSCHEME: Colorscheme = Colorscheme {
     edge: DARKPURPLE,
     shape: BLACK,
     start: DARKGREEN,
+    end: RED,
+    path: BLUE,
     bsp_plane: |depth| hsl_to_rgb(depth as f32 / 8.0, 1.0, 0.5),
 };
 
@@ -35,6 +44,8 @@ const GRAYSCALE: Colorscheme = Colorscheme {
     background: WHITE,
     edge: GRAY,
     shape: BLACK,
+    end: GRAY,
+    path: BLACK,
     bsp_plane: |depth| hsl_to_rgb(1.0, 0.0, (depth as f32 / 8.0).min(0.9)),
     start: BLACK,
 };
@@ -70,7 +81,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let rect1 = Shape::rect(Vec2::new(200.0, 100.0), Vec2::new(200.0, 300.0));
-    let rect2 = Shape::rect(Vec2::new(50.0, 200.0), Vec2::new(275.0, 450.0));
+    let rect2 = Shape::rect(Vec2::new(50.0, 200.0), Vec2::new(230.0, 450.0));
 
     let tri1 = Shape::new(&[
         Vec2::new(600.0, 100.0),
@@ -82,6 +93,7 @@ async fn main() {
     let poly2 = Shape::regular_polygon(3, 50.0, Vec2::new(200.0, 100.0));
 
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
+    let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
     let corners = [
         Vec2::new(0.0, screen_height() - 0.0),
@@ -115,15 +127,30 @@ async fn main() {
             start = pos;
         }
 
+        if is_mouse_button_down(MouseButton::Right) {
+            let pos = mouse_position().into();
+
+            end = pos;
+        }
+
         draw_circle(start.x, start.y, POINT_RADIUS, COLORSCHEME.start);
+        draw_circle(end.x, end.y, POINT_RADIUS, COLORSCHEME.end);
+
+        // Find the path
+        let path = astar(&tree, &edges, start, end, |cur, end| cur.distance(end));
+        if let Some(path) = path {
+            path.draw();
+        } else {
+            eprintln!("No path!");
+        }
 
         let node = tree.containing_node(start);
         if !node.covered() {
             node.node().draw();
-            edges.get(node.index()).unwrap().draw()
+            edges.get(node.index()).draw()
         }
 
-        // tree.draw();
+        tree.draw();
         // edges.draw();
         world.draw();
 
@@ -133,8 +160,9 @@ async fn main() {
 
 const THICKNESS: f32 = 3.0;
 const POINT_RADIUS: f32 = 10.0;
-const VERTEX_RADIUS: f32 = 8.0;
+const VERTEX_RADIUS: f32 = 4.0;
 const EDGE_THICKNESS: f32 = 4.0;
+const PATH_THICKNESS: f32 = 6.0;
 const NORMAL_LEN: f32 = 32.0;
 const ARROW_LEN: f32 = 8.0;
 
@@ -191,10 +219,6 @@ impl Draw for BSPNode {
 
             draw_line(p.x, p.y, q.x, q.y, THICKNESS, color);
         }
-
-        // for p in self.vertices() {
-        //     draw_circle(p.x, p.y, 16.0 - self.depth() as f32 * 2.0, color);
-        // }
     }
 }
 
@@ -220,5 +244,18 @@ impl Draw for Edge {
         let pos = self.pos();
         draw_circle(pos.x, pos.y, VERTEX_RADIUS, COLORSCHEME.edge);
         draw_line_dotted(p, q, EDGE_THICKNESS, COLORSCHEME.edge);
+    }
+}
+
+impl Draw for Path {
+    fn draw(&self) {
+        self.windows(2).for_each(|val| {
+            let a = val[0];
+            let b = val[1];
+
+            draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.path);
+            draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.path);
+            draw_line(a.x, a.y, b.x, b.y, PATH_THICKNESS, COLORSCHEME.path);
+        })
     }
 }

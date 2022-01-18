@@ -58,11 +58,12 @@ impl Edges {
                 let from = BSPNode::transitive_node(index, *a, nodes);
                 let to = BSPNode::transitive_node(child_index, *a, nodes);
 
-                self.add(
+                self.add(Edge::new(
+                    *a,
                     from,
                     to,
-                    Edge::new(*a, [nodes[from].origin(), nodes[to].origin()]),
-                );
+                    [nodes[from].origin(), nodes[to].origin()],
+                ));
             }
         }
 
@@ -86,17 +87,17 @@ impl Edges {
     }
 
     /// Adds a two way edge
-    pub fn add(&mut self, a: NodeIndex, b: NodeIndex, edge: Edge) {
+    pub fn add(&mut self, edge: Edge) {
         self.inner
-            .entry(a)
+            .entry(edge.src)
             .expect("Node was removed")
             .or_default()
             .push(edge);
         self.inner
-            .entry(b)
+            .entry(edge.dst)
             .expect("Node was removed")
             .or_default()
-            .push(edge);
+            .push(edge.reverse());
     }
 
     /// Iterate all edges
@@ -107,20 +108,39 @@ impl Edges {
     }
 
     /// Get the edges for a specific node
-    pub fn get(&self, index: NodeIndex) -> Option<&[Edge]> {
-        self.inner.get(index).map(|val| val.as_ref())
+    pub fn get(&self, index: NodeIndex) -> &[Edge] {
+        self.inner
+            .get(index)
+            .map(|val| val.as_ref())
+            .unwrap_or_default()
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Edge {
-    pos: Vec2,
+    pub pos: Vec2,
+    pub src: NodeIndex,
+    pub dst: NodeIndex,
     origins: [Vec2; 2],
 }
 
 impl Edge {
-    pub fn new(pos: Vec2, origins: [Vec2; 2]) -> Self {
-        Self { pos, origins }
+    pub fn new(pos: Vec2, src: NodeIndex, dst: NodeIndex, origins: [Vec2; 2]) -> Self {
+        Self {
+            pos,
+            src,
+            dst,
+            origins,
+        }
+    }
+
+    pub fn reverse(&self) -> Self {
+        Self {
+            pos: self.pos,
+            src: self.dst,
+            dst: self.src,
+            origins: [self.origins[1], self.origins[0]],
+        }
     }
 
     /// Get the edge's origins.

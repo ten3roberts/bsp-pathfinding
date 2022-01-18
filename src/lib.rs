@@ -1,6 +1,7 @@
 mod shape;
 mod tree;
 pub mod util;
+pub mod astar;
 
 pub use shape::*;
 pub use tree::*;
