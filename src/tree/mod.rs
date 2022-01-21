@@ -3,11 +3,11 @@ use slotmap::*;
 
 use crate::Face;
 
-pub use edges::*;
 pub use node::*;
+pub use portals::*;
 
-mod edges;
 mod node;
+mod portals;
 
 type Nodes = SlotMap<NodeIndex, BSPNode>;
 
@@ -18,6 +18,9 @@ new_key_type! {
 pub struct BSPTree {
     nodes: Nodes,
     root: NodeIndex,
+    // Bounds
+    l: Vec2,
+    r: Vec2,
 }
 
 impl BSPTree {
@@ -26,21 +29,21 @@ impl BSPTree {
     pub fn new(faces: impl Iterator<Item = Face>) -> Option<Self> {
         let faces: Vec<_> = faces.collect();
 
+        let mut l = Vec2::new(f32::MAX, f32::MAX);
+        let mut r = Vec2::new(f32::MIN, f32::MIN);
+
+        faces.iter().flatten().for_each(|val| {
+            l = l.min(val);
+            r = r.max(val);
+        });
+
+        l -= Vec2::splat(10.0);
+        r += Vec2::splat(10.0);
+
         let mut nodes = SlotMap::with_key();
-        let root = BSPNode::new(&mut nodes, &faces, None, 0)?;
+        let root = BSPNode::new(&mut nodes, &faces, 0)?;
 
-        Some(Self { nodes, root })
-    }
-
-    /// Constructs a new tree.
-    /// Returns None if there are not faces, and root construction was not possible
-    pub fn with_bounds(faces: impl Iterator<Item = Face>, bounds: &[Face]) -> Option<Self> {
-        let faces: Vec<_> = faces.collect();
-
-        let mut nodes = SlotMap::with_key();
-        let root = BSPNode::new(&mut nodes, &faces, Some(bounds.to_vec()), 0)?;
-
-        Some(Self { nodes, root })
+        Some(Self { nodes, root, l, r })
     }
 
     pub fn node(&self, index: NodeIndex) -> Option<&BSPNode> {
@@ -61,19 +64,16 @@ impl BSPTree {
         BSPNode::descendants(self.root, &self.nodes)
     }
 
-    pub fn generate_edges(&self) -> Edges {
-        Edges::new(self.root, &self.nodes)
-    }
-
     /// Returns the containing node and if the point is covered
-    pub fn containing_node(&self, point: Vec2) -> NodePayload {
+    pub fn locate(&self, point: Vec2) -> NodePayload {
         let mut index = self.root;
 
         loop {
             let node = &self.nodes[index];
             let rel = point - node.origin();
+            let dot = rel.dot(node.normal());
 
-            let (next, covered) = if rel.dot(node.normal()) > 0.0 {
+            let (next, covered) = if dot > 0.0 {
                 (node.front(), false)
             } else {
                 (node.back(), true)
@@ -86,16 +86,46 @@ impl BSPTree {
                     index,
                     node,
                     covered,
+                    depth: -node.normal() * dot,
                 };
             }
         }
     }
+
+    /// Get a mutable reference to the bsptree's root.
+    pub fn root_mut(&mut self) -> &mut NodeIndex {
+        &mut self.root
+    }
+
+    /// Get a reference to the bsptree's nodes.
+    pub fn nodes(&self) -> &Nodes {
+        &self.nodes
+    }
+
+    pub fn generate_portals<'a>(&self) -> Vec<Portal> {
+        let clipping_planes = vec![
+            Face::new([Vec2::new(self.l.x, self.r.y), self.l]),
+            Face::new([self.l, Vec2::new(self.r.x, self.l.y)]),
+            Face::new([Vec2::new(self.r.x, self.l.y), self.r]),
+            Face::new([self.r, Vec2::new(self.l.x, self.r.y)]),
+        ];
+
+        let mut portals = Vec::new();
+        BSPNode::generate_portals(
+            self.root,
+            &self.nodes,
+            clipping_planes.clone(),
+            &mut portals,
+        );
+        portals
+    }
 }
 
 pub struct NodePayload<'a> {
-    index: NodeIndex,
-    node: &'a BSPNode,
-    covered: bool,
+    pub index: NodeIndex,
+    pub node: &'a BSPNode,
+    pub covered: bool,
+    pub depth: Vec2,
 }
 
 impl<'a> NodePayload<'a> {
@@ -112,5 +142,10 @@ impl<'a> NodePayload<'a> {
     /// Get the node payload's covered.
     pub fn covered(&self) -> bool {
         self.covered
+    }
+
+    /// Get the node payload's depth.
+    pub fn depth(&self) -> Vec2 {
+        self.depth
     }
 }

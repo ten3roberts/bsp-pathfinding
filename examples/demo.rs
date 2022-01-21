@@ -1,6 +1,6 @@
 use bsp_path_finding::{
     astar::{astar, Path},
-    BSPNode, BSPTree, Edge, Edges, Face, Shape,
+    BSPNode, BSPTree, Face, Portal, Portals, Shape, Side,
 };
 use macroquad::{color::hsl_to_rgb, prelude::*};
 
@@ -50,7 +50,7 @@ const GRAYSCALE: Colorscheme = Colorscheme {
     start: BLACK,
 };
 
-const COLORSCHEME: Colorscheme = GRAYSCALE;
+const COLORSCHEME: Colorscheme = LIGHT_COLORSCHEME;
 
 /// Draws a dotted line, performance isn't great due to many draw calls. This is
 /// acceptable as it is only for visualization.
@@ -78,6 +78,7 @@ fn window_conf() -> Conf {
         ..Default::default()
     }
 }
+
 #[macroquad::main(window_conf)]
 async fn main() {
     let rect1 = Shape::rect(Vec2::new(200.0, 100.0), Vec2::new(200.0, 300.0));
@@ -89,35 +90,17 @@ async fn main() {
         Vec2::new(500.0, 200.0),
     ]);
 
-    let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 400.0));
+    let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 300.0));
     let poly2 = Shape::regular_polygon(3, 50.0, Vec2::new(200.0, 100.0));
 
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
-    let corners = [
-        Vec2::new(0.0, screen_height() - 0.0),
-        Vec2::new(screen_width() - 0.0, screen_height() - 0.0),
-        Vec2::new(screen_width() - 0.0, 0.0),
-        Vec2::new(0.0, 0.0),
-    ];
-
-    // Encapsulate the scene to allow for calculation of bsp bounds for
-    // visualization
-    let bounds = [
-        Face::new([corners[0], corners[1]]),
-        Face::new([corners[1], corners[2]]),
-        Face::new([corners[2], corners[3]]),
-        Face::new([corners[3], corners[0]]),
-    ];
-
     let world = &[rect1, rect2, tri1, poly1, poly2];
 
-    let tree = BSPTree::with_bounds(world.iter().flat_map(|val| val.faces()), &bounds)
-        .expect("Existent faces");
+    let tree = BSPTree::new(world.iter().flat_map(|val| val.faces())).expect("Existent faces");
 
-    let edges = tree.generate_edges();
-
+    let portals = Portals::from_tree(&tree);
     loop {
         clear_background(COLORSCHEME.background);
 
@@ -137,22 +120,39 @@ async fn main() {
         draw_circle(end.x, end.y, POINT_RADIUS, COLORSCHEME.end);
 
         // Find the path
-        let path = astar(&tree, &edges, start, end, |cur, end| cur.distance(end));
+        let path = astar(&tree, &portals, start, end, |cur, end| cur.distance(end));
+
         if let Some(path) = path {
             path.draw();
-        } else {
-            eprintln!("No path!");
         }
 
-        let node = tree.containing_node(start);
+        let node = tree.locate(start);
         if !node.covered() {
             node.node().draw();
-            edges.get(node.index()).draw()
+            portals.get(node.index()).draw()
         }
 
         tree.draw();
-        // edges.draw();
         world.draw();
+        // portals.draw();
+
+        for portal in portals.get(tree.locate(start).index) {
+            let dst = tree.node(portal.dst).unwrap();
+            let src = tree.node(portal.src).unwrap();
+
+            draw_line_dotted(
+                portal.vertices[0],
+                dst.origin(),
+                EDGE_THICKNESS,
+                COLORSCHEME.path,
+            );
+            draw_line_dotted(
+                portal.vertices[1],
+                src.origin(),
+                EDGE_THICKNESS,
+                COLORSCHEME.path,
+            );
+        }
 
         next_frame().await
     }
@@ -160,7 +160,7 @@ async fn main() {
 
 const THICKNESS: f32 = 3.0;
 const POINT_RADIUS: f32 = 10.0;
-const VERTEX_RADIUS: f32 = 4.0;
+const VERTEX_RADIUS: f32 = 6.0;
 const EDGE_THICKNESS: f32 = 4.0;
 const PATH_THICKNESS: f32 = 6.0;
 const NORMAL_LEN: f32 = 32.0;
@@ -170,13 +170,21 @@ trait Draw {
     fn draw(&self);
 }
 
+impl Draw for Face {
+    fn draw(&self) {
+        let a = self.vertices[1];
+        let b = self.vertices[0];
+
+        draw_line(a.x, a.y, b.x, b.y, THICKNESS, COLORSCHEME.shape);
+        // draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.shape);
+        // draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.shape);
+    }
+}
+
 impl Draw for Shape {
     fn draw(&self) {
         for face in self.faces() {
-            let a = face.vertices[1];
-            let b = face.vertices[0];
-
-            draw_line(a.x, a.y, b.x, b.y, THICKNESS, COLORSCHEME.shape);
+            face.draw()
         }
     }
 }
@@ -212,38 +220,47 @@ impl Draw for BSPNode {
             end - normal_perp * ARROW_LEN,
             color,
         );
+    }
+}
 
-        if let Some(bounds) = self.bounds() {
-            let p = bounds[0];
-            let q = bounds[1];
+impl Draw for Portal {
+    fn draw(&self) {
+        let a = self.vertices[1];
+        let b = self.vertices[0];
 
-            draw_line(p.x, p.y, q.x, q.y, THICKNESS, color);
+        draw_line_dotted(a, b, VERTEX_RADIUS, COLORSCHEME.edge);
+
+        if self.sides()[0] == Side::Front {
+            draw_circle(
+                self.vertices[0].x,
+                self.vertices[0].y,
+                VERTEX_RADIUS,
+                COLORSCHEME.edge,
+            );
+        }
+        if self.sides()[1] == Side::Front {
+            draw_circle(
+                self.vertices[1].x,
+                self.vertices[1].y,
+                VERTEX_RADIUS,
+                COLORSCHEME.edge,
+            );
         }
     }
 }
 
-impl Draw for Edges {
+impl Draw for &[Portal] {
     fn draw(&self) {
-        for edge in self.iter().flatten() {
-            edge.draw()
+        for portal in *self {
+            portal.draw();
         }
     }
 }
-
-impl Draw for [Edge] {
+impl Draw for Portals {
     fn draw(&self) {
-        for val in self {
-            val.draw()
+        for portal in self.iter().flatten() {
+            portal.draw()
         }
-    }
-}
-
-impl Draw for Edge {
-    fn draw(&self) {
-        let [p, q] = self.origins();
-        let pos = self.pos();
-        draw_circle(pos.x, pos.y, VERTEX_RADIUS, COLORSCHEME.edge);
-        draw_line_dotted(p, q, EDGE_THICKNESS, COLORSCHEME.edge);
     }
 }
 

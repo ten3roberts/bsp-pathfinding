@@ -1,8 +1,8 @@
-use std::f32::consts::TAU;
+use std::{array, f32::consts::TAU};
 
 use glam::Vec2;
 
-use crate::TOLERANCE;
+use crate::{util::Intersect, TOLERANCE};
 
 /// Defines a 2d shape
 #[derive(Default, Debug, Clone)]
@@ -79,11 +79,10 @@ impl Face {
         self.normal
     }
 
-    /// Returns the side self is in respect to `face`
-    pub fn side_of(&self, face: &Face) -> Side {
-        let p = face.vertices[0];
-        let a = (self.vertices[0] - p).dot(face.normal);
-        let b = (self.vertices[1] - p).dot(face.normal);
+    /// Returns the side self is in respect to a point and normal
+    pub fn side_of(&self, p: Vec2, normal: Vec2) -> Side {
+        let a = (self.vertices[0] - p).dot(normal);
+        let b = (self.vertices[1] - p).dot(normal);
 
         if a.abs() < TOLERANCE && b.abs() < TOLERANCE {
             Side::Coplanar
@@ -97,15 +96,35 @@ impl Face {
     }
 
     /// Splits the face around `p`
-    pub fn split(&self, p: Vec2) -> [Self; 2] {
+    pub fn split(&self, p: Intersect) -> [Self; 2] {
         [
-            Face::new([p, self.vertices[0]]),
-            Face::new([self.vertices[1], p]),
+            Face::new([p.point, self.vertices[0]]),
+            Face::new([self.vertices[1], p.point]),
         ]
     }
 
     pub fn midpoint(&self) -> Vec2 {
         (self.vertices[0] + self.vertices[1]) / 2.0
+    }
+}
+
+impl<'a> IntoIterator for &'a Shape {
+    type Item = Face;
+
+    type IntoIter = Faces<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.faces()
+    }
+}
+
+impl<'a> IntoIterator for &'a Face {
+    type Item = Vec2;
+
+    type IntoIter = array::IntoIter<Vec2, 2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.vertices.into_iter()
     }
 }
 
@@ -159,4 +178,14 @@ pub enum Side {
     Back,
     Coplanar,
     Intersecting,
+}
+
+impl Side {
+    pub fn min(&self, other: Self) -> Self {
+        match (self, other) {
+            (Side::Back, _) => Side::Back,
+            (_, Side::Back) => Side::Back,
+            _ => *self,
+        }
+    }
 }

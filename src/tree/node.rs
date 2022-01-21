@@ -1,13 +1,15 @@
 use glam::Vec2;
 use ordered_float::OrderedFloat;
+use slotmap::Key;
 
 use crate::{
-    util::{line_intersect, line_intersect_dir},
-    Face, Side, TOLERANCE,
+    util::{face_intersect, face_intersect_dir, Intersect},
+    Face, Portal, Side, TOLERANCE,
 };
 
 use super::{NodeIndex, Nodes};
 
+#[derive(Debug)]
 pub struct BSPNode {
     origin: Vec2,
     normal: Vec2,
@@ -15,23 +17,13 @@ pub struct BSPNode {
     front: Option<NodeIndex>,
     back: Option<NodeIndex>,
 
-    vertices: [Vec2; 2],
-
-    /// Represents how far the line extends, for visualization purposes
-    bounds: Option<[Vec2; 2]>,
-
     depth: usize,
 }
 
 impl BSPNode {
     /// Creates a new BSPNode and inserts it into nodes.
     /// Returns None if there were not faces to create a node from
-    pub fn new(
-        nodes: &mut Nodes,
-        faces: &[Face],
-        mut bounds: Option<Vec<Face>>,
-        depth: usize,
-    ) -> Option<NodeIndex> {
+    pub fn new(nodes: &mut Nodes, faces: &[Face], depth: usize) -> Option<NodeIndex> {
         let (current, faces) = faces.split_first()?;
         let mut vertices = current.vertices;
         let dir = (vertices[1] - vertices[0]).normalize();
@@ -39,8 +31,11 @@ impl BSPNode {
         let mut front = Vec::new();
         let mut back = Vec::new();
 
+        let p = current.vertices[0];
+        let normal = current.normal;
+
         for face in faces {
-            let side = face.side_of(current);
+            let side = face.side_of(current.vertices[0], current.normal);
             match side {
                 Side::Front => front.push(*face),
                 Side::Back => back.push(*face),
@@ -49,18 +44,18 @@ impl BSPNode {
                     // Split the line in two and repeat the process
 
                     // Split face around this point
-                    let intersect = line_intersect(
-                        (face.vertices[0], face.vertices[1]),
-                        (current.vertices[0], current.vertices[1]),
-                    );
+                    let intersect = face_intersect((face.vertices[0], face.vertices[1]), p, normal);
 
-                    let [a, b] = face.split(intersect);
+                    let [mut a, mut b] = face.split(intersect);
 
+                    dbg!(a.normal(), b.normal(), face.normal());
+                    a.normal *= a.normal.dot(face.normal).signum();
+                    b.normal *= b.normal.dot(face.normal).signum();
                     assert!(a.normal.dot(face.normal) > 0.0);
                     assert!(b.normal.dot(face.normal) > 0.0);
 
                     // Either a is in front, and b behind, or vice versa
-                    if let Side::Front = a.side_of(current) {
+                    if let Side::Front = a.side_of(p, normal) {
                         front.push(a);
                         back.push(b)
                     } else {
@@ -71,40 +66,11 @@ impl BSPNode {
             }
         }
 
-        // Calculate how long this partition reaches. This is only used for
-        // visualization purposes, and does nothing if `None` is passed
-        let [p, q] = vertices;
-        let min = bounds
-            .iter()
-            .flatten()
-            .map(|bound| line_intersect_dir(bound.into_tuple(), p, dir))
-            .filter(|val| val.is_finite() && *val > TOLERANCE)
-            .min_by_key(|val| OrderedFloat(*val));
-
-        let max = bounds
-            .iter()
-            .flatten()
-            .map(|bound| line_intersect_dir(bound.into_tuple(), q, -dir))
-            .filter(|val| val.is_finite() && *val > TOLERANCE)
-            .min_by_key(|val| OrderedFloat(val.abs()));
-
-        let node_bounds = if let (Some(min), Some(max)) = (min, max) {
-            let a = p + dir * min;
-            let b = q - dir * max;
-            Some([a, b])
-        } else {
-            None
-        };
-
-        if let Some(bounds) = bounds.as_mut() {
-            bounds.push(*current)
-        }
-
         // Free up space before recursing
         drop(faces);
 
-        let front = Self::new(nodes, &mut front, bounds.clone(), depth + 1);
-        let back = Self::new(nodes, &mut back, bounds.clone(), depth + 1);
+        let front = Self::new(nodes, &mut front, depth + 1);
+        let back = Self::new(nodes, &mut back, depth + 1);
 
         assert!(current.normal.is_normalized());
 
@@ -114,8 +80,6 @@ impl BSPNode {
             normal: current.normal,
             front,
             back,
-            vertices,
-            bounds: node_bounds,
             depth,
         };
 
@@ -153,17 +117,14 @@ impl BSPNode {
         self.back
     }
 
-    /// Get a reference to the bspnode's vertices.
-    pub fn vertices(&self) -> &[Vec2] {
-        self.vertices.as_ref()
-    }
-
     /// Get the bspnode's normal.
+    #[inline]
     pub fn normal(&self) -> Vec2 {
         self.normal
     }
 
     /// Get the bspnode's origin.
+    #[inline]
     pub fn origin(&self) -> Vec2 {
         self.origin
     }
@@ -175,44 +136,129 @@ impl BSPNode {
         }
     }
 
-    /// Get the bspnode's bounds.
-    pub fn bounds(&self) -> Option<[Vec2; 2]> {
-        self.bounds
-    }
-
     /// Get the bspnode's depth.
     pub fn depth(&self) -> usize {
         self.depth
     }
 
-    /// Returns the transitive node of this node.
-    /// This is the child node that is the closest node in front of the current
-    /// node.
-    pub(crate) fn transitive_node(index: NodeIndex, point: Vec2, nodes: &Nodes) -> NodeIndex {
+    /// Clips a face by the BSP faces and returns several smaller faces
+    pub fn clip(
+        index: NodeIndex,
+        nodes: &Nodes,
+        mut portal: Portal,
+        root_side: Side,
+    ) -> Vec<Portal> {
         let node = &nodes[index];
+        let side = portal.side_of(node.origin, node.normal);
 
-        // Start with the front child
-        let mut index = match node.front {
-            Some(val) => val,
-            None => return index,
-        };
+        // The face is entirely in front of the node
+        match (side, node.front, node.back) {
+            (Side::Coplanar, Some(front), Some(back)) => {
+                // portal.src = NodeIndex::null();
+                Self::clip(front, nodes, portal, Side::Front)
+                    .into_iter()
+                    .map(|val| Self::clip(back, nodes, val, Side::Back))
+                    .flatten()
+                    .collect()
+            }
+            (Side::Coplanar, Some(front), _) => Self::clip(front, nodes, portal, Side::Front),
+            (Side::Coplanar, _, Some(back)) => Self::clip(back, nodes, portal, Side::Back),
+            (Side::Front, Some(front), _) => Self::clip(front, nodes, portal, root_side),
+            (Side::Back, _, Some(back)) => Self::clip(back, nodes, portal, root_side),
+            (Side::Intersecting, _, _) => {
+                // Split the face at the intersection
+                let [a, b] = portal.split(node.origin, node.normal);
 
-        loop {
-            let node = &nodes[index];
-
-            let rel = node.origin - point;
-
-            let child = if rel.dot(node.normal) > TOLERANCE {
-                node.back
-            } else {
-                node.front
-            };
-
-            index = match child {
-                Some(val) => val,
-                None => return index,
-            };
+                let mut result = Self::clip(index, nodes, a, root_side);
+                result.append(&mut Self::clip(index, nodes, b, root_side));
+                result
+            }
+            _ => {
+                dbg!(side);
+                if root_side == Side::Back {
+                    portal.dst = index;
+                } else {
+                    portal.src = index;
+                }
+                vec![portal]
+            }
         }
+    }
+
+    pub fn generate_portals(
+        index: NodeIndex,
+        nodes: &Nodes,
+        mut clipping_planes: Vec<Face>,
+        result: &mut Vec<Portal>,
+    ) {
+        let node = &nodes[index];
+        let dir = Vec2::new(node.normal.y, -node.normal.x);
+        let mut min = Intersect::new(Vec2::ZERO, f32::MAX);
+        let mut min_side = Side::Coplanar;
+        let mut max_side = Side::Coplanar;
+        let mut max = Intersect::new(Vec2::ZERO, f32::MAX);
+
+        clipping_planes.iter().for_each(|val| {
+            let intersect = face_intersect_dir(node.origin, dir, val.vertices[0], val.normal());
+            if !intersect.distance.is_finite() {
+                return;
+            }
+
+            let side = if (val.vertices[0] - node.origin()).dot(val.normal()) > 0.0 {
+                Side::Front
+            } else {
+                Side::Back
+            };
+
+            if intersect.distance > 0.0 && intersect.distance < max.distance {
+                max = intersect;
+                max_side = side;
+            }
+            if intersect.distance < 0.0 && intersect.distance.abs() < min.distance.abs() {
+                min = intersect;
+                min_side = side;
+            }
+        });
+
+        let face = Face::new([min.point, max.point]);
+
+        assert_ne!(min_side, Side::Coplanar);
+        assert_ne!(max_side, Side::Coplanar);
+
+        let portal = Portal::new(face.vertices, [min_side, max_side], index, index);
+
+        result.extend(
+            Self::clip(index, nodes, portal, Side::Front)
+                .into_iter()
+                .filter(|val| {
+                    dbg!(val);
+                    // assert_ne!(val.src, val.dst);
+                    assert!(!val.src.is_null());
+                    assert!(!val.dst.is_null());
+
+                    // true
+                    val.sides() == [Side::Front, Side::Front]
+                }),
+        );
+
+        // Add the current nodes clip plane before recursing
+        // result.push(portal);
+        clipping_planes.push(face);
+
+        // Clone the clipping faces since the descendants of the children will
+        // also be added to the clipping planes,
+        // and we want to keep the clipping planes separated for subtrees.
+        if let Some(child) = node.front {
+            Self::generate_portals(child, nodes, clipping_planes.clone(), result);
+        }
+
+        if let Some(child) = node.back {
+            Self::generate_portals(child, nodes, clipping_planes.clone(), result);
+        }
+    }
+
+    pub fn is_leaf(&self) -> bool {
+        self.front.is_none() && self.back.is_none()
     }
 }
 

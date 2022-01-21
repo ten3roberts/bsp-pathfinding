@@ -6,7 +6,7 @@ use std::{
 use glam::Vec2;
 use slotmap::{secondary::Entry, SecondaryMap};
 
-use crate::{BSPTree, Edges, NodeIndex};
+use crate::{BSPTree, NodeIndex, Portals};
 
 #[derive(Debug, Clone)]
 pub struct Path {
@@ -29,26 +29,31 @@ impl Deref for Path {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-struct TraversedNode {
+struct Backtrace {
     node: NodeIndex,
+    // The first side of the portal
+    left: Vec2,
+    // The other edge of the portal
+    right: Vec2,
     prev: Option<NodeIndex>,
-    pos: Vec2,
     start_cost: f32,
     total_cost: f32,
 }
 
-impl TraversedNode {
+impl Backtrace {
     pub fn from_backtrace(
         node: NodeIndex,
-        backtrace: &TraversedNode,
-        pos: Vec2,
+        left: Vec2,
+        right: Vec2,
+        backtrace: &Backtrace,
         heuristic: f32,
     ) -> Self {
-        let start_cost = backtrace.start_cost + pos.distance(backtrace.pos);
+        let start_cost = backtrace.start_cost + left.distance(backtrace.left);
         Self {
             node,
+            left,
+            right,
             prev: Some(backtrace.node),
-            pos,
             start_cost,
             total_cost: start_cost + heuristic,
         }
@@ -56,15 +61,17 @@ impl TraversedNode {
 
     pub fn new(
         node: NodeIndex,
+        left: Vec2,
+        right: Vec2,
         prev: Option<NodeIndex>,
-        pos: Vec2,
         start_cost: f32,
         heuristic: f32,
     ) -> Self {
         Self {
             node,
+            left,
+            right,
             prev,
-            pos,
             start_cost,
             total_cost: start_cost + heuristic,
         }
@@ -72,15 +79,15 @@ impl TraversedNode {
 }
 
 // Order by lowest total_cost
-impl PartialOrd for TraversedNode {
+impl PartialOrd for Backtrace {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         other.total_cost.partial_cmp(&self.total_cost)
     }
 }
 
-impl Eq for TraversedNode {}
+impl Eq for Backtrace {}
 
-impl Ord for TraversedNode {
+impl Ord for Backtrace {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         other
             .total_cost
@@ -91,14 +98,14 @@ impl Ord for TraversedNode {
 
 pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
     tree: &BSPTree,
-    edges: &Edges,
+    portals: &Portals,
     start: Vec2,
     end: Vec2,
     heuristic: F,
 ) -> Option<Path> {
     let mut open = BinaryHeap::new();
-    let start_node = tree.containing_node(start);
-    let end_node = tree.containing_node(end);
+    let start_node = tree.locate(start);
+    let end_node = tree.locate(end);
 
     // No path if start or end a covered
     if start_node.covered() || end_node.covered() {
@@ -109,8 +116,8 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
     let end_node = end_node.index();
 
     // Information of how a node was reached
-    let mut backtraces: SecondaryMap<_, TraversedNode> = SecondaryMap::new();
-    let start = TraversedNode::new(start_node, None, start, 0.0, (heuristic)(start, end));
+    let mut backtraces: SecondaryMap<_, Backtrace> = SecondaryMap::new();
+    let start = Backtrace::new(start_node, start, start, None, 0.0, (heuristic)(start, end));
 
     // Push the fist node
     open.push(start);
@@ -132,36 +139,52 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         }
 
         // Add all edges to the open list and update backtraces
-        let edges = edges.get(current.node).iter().map(|edge| {
-            assert_eq!(edge.src, current.node);
+        let portals = portals
+            .get(current.node)
+            .iter()
+            .map(|edge| {
+                assert_eq!(edge.src(), current.node);
 
-            // Calculate cost based on current position
-            let traversed_node = TraversedNode::from_backtrace(
-                edge.dst,
-                &current,
-                edge.pos,
-                (heuristic)(edge.pos, end),
-            );
-
-            // Update backtrace
-            // If the cost to this node is lower than previosuly found,
-            // overwrite with the new backtrace.
-            match backtraces.entry(edge.dst).unwrap() {
-                Entry::Occupied(mut val) => {
-                    if val.get().total_cost > traversed_node.total_cost {
-                        val.insert(traversed_node);
+                // Calculate cost based on current position
+                // Try both ends of the portal
+                [
+                    Backtrace::from_backtrace(
+                        edge.dst(),
+                        edge.vertices[0],
+                        edge.vertices[1],
+                        &current,
+                        (heuristic)(edge.vertices[0], end),
+                    ),
+                    Backtrace::from_backtrace(
+                        edge.dst(),
+                        edge.vertices[1],
+                        edge.vertices[0],
+                        &current,
+                        (heuristic)(edge.vertices[1], end),
+                    ),
+                ]
+            })
+            .flatten()
+            .map(|backtrace| {
+                // Update backtrace
+                // If the cost to this node is lower than previosuly found,
+                // overwrite with the new backtrace.
+                match backtraces.entry(backtrace.node).unwrap() {
+                    Entry::Occupied(mut val) => {
+                        if val.get().total_cost > backtrace.total_cost {
+                            val.insert(backtrace);
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert(backtrace);
                     }
                 }
-                Entry::Vacant(entry) => {
-                    entry.insert(traversed_node);
-                }
-            }
 
-            traversed_node
-        });
+                backtrace
+            });
 
         // Add the edges
-        open.extend(edges);
+        open.extend(portals);
 
         // The current node is now done and won't be revisited
         assert!(closed.insert(current.node))
@@ -173,13 +196,12 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 fn backtrace(
     end: Vec2,
     mut current: NodeIndex,
-    backtraces: SecondaryMap<NodeIndex, TraversedNode>,
+    backtraces: SecondaryMap<NodeIndex, Backtrace>,
 ) -> Path {
-    eprintln!("Found path");
     let mut backtrace = vec![end];
     loop {
         let node = backtraces[current];
-        backtrace.push(node.pos);
+        backtrace.push(node.left);
 
         // Continue up the backtrace
         if let Some(prev) = node.prev {
