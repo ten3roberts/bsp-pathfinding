@@ -10,7 +10,7 @@ use crate::{util::face_intersect, BSPTree, Face, NodeIndex, Side, TOLERANCE};
 pub struct Portal {
     face: Face,
     // Used to determine if a face is completely inside
-    sides: [Side; 2],
+    pub(crate) sides: [Side; 2],
 
     pub src: NodeIndex,
     pub dst: NodeIndex,
@@ -51,8 +51,8 @@ impl Portal {
             // a is behind
             [
                 Self::new(
-                    [intersection.point, self.vertices[1]],
-                    [Side::Front, self.sides[1]],
+                    [self.vertices[1], intersection.point],
+                    [self.sides[1], Side::Front],
                     self.src,
                     self.dst,
                 ),

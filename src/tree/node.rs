@@ -167,10 +167,14 @@ impl BSPNode {
             (Side::Back, _, Some(back)) => Self::clip(back, nodes, portal, root_side),
             (Side::Intersecting, _, _) => {
                 // Split the face at the intersection
-                let [a, b] = portal.split(node.origin, node.normal);
+                let [mut front, back] = portal.split(node.origin, node.normal);
 
-                let mut result = Self::clip(index, nodes, a, root_side);
-                result.append(&mut Self::clip(index, nodes, b, root_side));
+                if root_side == Side::Back {
+                    front.sides[0] = Side::Front;
+                }
+
+                let mut result = Self::clip(index, nodes, front, root_side);
+                result.append(&mut Self::clip(index, nodes, back, root_side));
                 result
             }
             _ => {
