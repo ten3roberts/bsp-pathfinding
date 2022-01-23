@@ -2,7 +2,7 @@ use std::{array, f32::consts::TAU};
 
 use glam::Vec2;
 
-use crate::{util::Intersect, TOLERANCE};
+use crate::TOLERANCE;
 
 /// Defines a 2d shape
 #[derive(Default, Debug, Clone)]
@@ -96,10 +96,10 @@ impl Face {
     }
 
     /// Splits the face around `p`
-    pub fn split(&self, p: Intersect) -> [Self; 2] {
+    pub fn split(&self, p: Vec2) -> [Self; 2] {
         [
-            Face::new([p.point, self.vertices[0]]),
-            Face::new([self.vertices[1], p.point]),
+            Face::new([p, self.vertices[0]]),
+            Face::new([self.vertices[1], p]),
         ]
     }
 

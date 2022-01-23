@@ -1,13 +1,15 @@
+use core::slice;
 use std::ops::Deref;
 
 use glam::Vec2;
 use slotmap::{secondary::Iter, SecondaryMap};
 use smallvec::SmallVec;
 
-use crate::{util::face_intersect, BSPTree, Face, NodeIndex, Side, TOLERANCE};
+use crate::{util::face_intersect, BSPTree, Face, NodeIndex, Portal, PortalRef, Side, TOLERANCE};
 
 #[derive(Copy, Debug, Clone, PartialEq)]
-pub struct Portal {
+#[doc(hidden)]
+pub struct ClippedFace {
     face: Face,
     // Used to determine if a face is completely inside
     pub(crate) sides: [Side; 2],
@@ -16,7 +18,7 @@ pub struct Portal {
     pub dst: NodeIndex,
 }
 
-impl Portal {
+impl ClippedFace {
     pub fn new(vertices: [Vec2; 2], sides: [Side; 2], src: NodeIndex, dst: NodeIndex) -> Self {
         Self {
             face: Face::new(vertices),
@@ -80,18 +82,9 @@ impl Portal {
     pub fn sides(&self) -> [Side; 2] {
         self.sides
     }
-
-    pub fn reverse(&self) -> Self {
-        Self {
-            face: self.face,
-            sides: self.sides,
-            src: self.dst,
-            dst: self.src,
-        }
-    }
 }
 
-impl Deref for Portal {
+impl Deref for ClippedFace {
     type Target = Face;
 
     fn deref(&self) -> &Self::Target {
@@ -99,16 +92,18 @@ impl Deref for Portal {
     }
 }
 
-pub type NodePortals = SmallVec<[Portal; 4]>;
+type NodePortals = SmallVec<[PortalRef; 4]>;
 
 pub struct Portals {
     inner: SecondaryMap<NodeIndex, NodePortals>,
+    faces: Vec<Face>,
 }
 
 impl Portals {
     pub fn new() -> Self {
         Self {
             inner: SecondaryMap::new(),
+            faces: Vec::new(),
         }
     }
 
@@ -124,36 +119,82 @@ impl Portals {
         portals
     }
 
-    pub fn add(&mut self, portal: Portal) {
-        let reverse = portal.reverse();
+    pub fn add(&mut self, portal: ClippedFace) {
+        let face = self.faces.len();
+        self.faces.push(portal.face);
+
+        assert_ne!(portal.src, portal.dst);
+
         self.inner
             .entry(portal.src)
             .expect("Node was removed")
             .or_default()
-            .push(portal);
+            .push(PortalRef {
+                dst: portal.dst,
+                src: portal.src,
+                face,
+            });
         self.inner
-            .entry(reverse.src)
+            .entry(portal.dst)
             .expect("Node was removed")
             .or_default()
-            .push(reverse);
+            .push(PortalRef {
+                dst: portal.src,
+                src: portal.dst,
+                face,
+            });
     }
 
-    pub fn get(&self, index: NodeIndex) -> &[Portal] {
-        self.inner
-            .get(index)
-            .map(|val| val.as_ref())
-            .unwrap_or_default()
+    pub fn get(&self, index: NodeIndex) -> PortalIter {
+        PortalIter {
+            faces: &self.faces,
+            iter: self
+                .inner
+                .get(index)
+                .map(|val| val.as_ref())
+                .unwrap_or_default()
+                .iter(),
+            src: index,
+        }
     }
 
     pub fn iter(&self) -> PortalsIter {
         PortalsIter {
+            faces: &self.faces,
             inner: self.inner.iter(),
+        }
+    }
+
+    pub fn from_ref(&self, portal: PortalRef) -> Portal {
+        Portal {
+            face: &self.faces[portal.face],
+            portal_ref: portal,
         }
     }
 }
 
+#[doc(hidden)]
+pub struct PortalIter<'a> {
+    faces: &'a [Face],
+    iter: slice::Iter<'a, PortalRef>,
+    src: NodeIndex,
+}
+
+impl<'a> Iterator for PortalIter<'a> {
+    type Item = Portal<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let portal = self.iter.next()?;
+
+        Some(Portal {
+            face: &self.faces[portal.face],
+            portal_ref: *portal,
+        })
+    }
+}
+
 impl<'a> IntoIterator for &'a Portals {
-    type Item = &'a [Portal];
+    type Item = PortalIter<'a>;
 
     type IntoIter = PortalsIter<'a>;
 
@@ -162,20 +203,26 @@ impl<'a> IntoIterator for &'a Portals {
     }
 }
 
-impl Default for Portals {
-    fn default() -> Self {
-        Self::new()
-    }
-}
 pub struct PortalsIter<'a> {
+    faces: &'a [Face],
     inner: Iter<'a, NodeIndex, NodePortals>,
 }
 
 impl<'a> Iterator for PortalsIter<'a> {
-    type Item = &'a [Portal];
+    type Item = PortalIter<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (_, edges) = self.inner.next()?;
-        Some(edges.as_ref())
+        let (src, portals) = self.inner.next()?;
+        Some(PortalIter {
+            faces: self.faces,
+            iter: portals.iter(),
+            src,
+        })
+    }
+}
+
+impl Default for Portals {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -4,7 +4,7 @@ use slotmap::Key;
 
 use crate::{
     util::{face_intersect, face_intersect_dir, Intersect},
-    Face, Portal, Side, TOLERANCE,
+    ClippedFace, Face, Side, TOLERANCE,
 };
 
 use super::{NodeIndex, Nodes};
@@ -46,7 +46,7 @@ impl BSPNode {
                     // Split face around this point
                     let intersect = face_intersect((face.vertices[0], face.vertices[1]), p, normal);
 
-                    let [mut a, mut b] = face.split(intersect);
+                    let [mut a, mut b] = face.split(intersect.point);
 
                     dbg!(a.normal(), b.normal(), face.normal());
                     a.normal *= a.normal.dot(face.normal).signum();
@@ -145,9 +145,9 @@ impl BSPNode {
     pub fn clip(
         index: NodeIndex,
         nodes: &Nodes,
-        mut portal: Portal,
+        mut portal: ClippedFace,
         root_side: Side,
-    ) -> Vec<Portal> {
+    ) -> Vec<ClippedFace> {
         let node = &nodes[index];
         let side = portal.side_of(node.origin, node.normal);
 
@@ -193,7 +193,7 @@ impl BSPNode {
         index: NodeIndex,
         nodes: &Nodes,
         mut clipping_planes: Vec<Face>,
-        result: &mut Vec<Portal>,
+        result: &mut Vec<ClippedFace>,
     ) {
         let node = &nodes[index];
         let dir = Vec2::new(node.normal.y, -node.normal.x);
@@ -229,13 +229,12 @@ impl BSPNode {
         assert_ne!(min_side, Side::Coplanar);
         assert_ne!(max_side, Side::Coplanar);
 
-        let portal = Portal::new(face.vertices, [min_side, max_side], index, index);
+        let portal = ClippedFace::new(face.vertices, [min_side, max_side], index, index);
 
         result.extend(
             Self::clip(index, nodes, portal, Side::Front)
                 .into_iter()
                 .filter(|val| {
-                    dbg!(val);
                     // assert_ne!(val.src, val.dst);
                     assert!(!val.src.is_null());
                     assert!(!val.dst.is_null());

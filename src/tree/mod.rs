@@ -4,9 +4,11 @@ use slotmap::*;
 use crate::Face;
 
 pub use node::*;
+pub use portal::*;
 pub use portals::*;
 
 mod node;
+mod portal;
 mod portals;
 
 type Nodes = SlotMap<NodeIndex, BSPNode>;
@@ -102,7 +104,7 @@ impl BSPTree {
         &self.nodes
     }
 
-    pub fn generate_portals<'a>(&self) -> Vec<Portal> {
+    pub fn generate_portals<'a>(&self) -> Vec<ClippedFace> {
         let clipping_planes = vec![
             Face::new([Vec2::new(self.l.x, self.r.y), self.l]),
             Face::new([self.l, Vec2::new(self.r.x, self.l.y)]),

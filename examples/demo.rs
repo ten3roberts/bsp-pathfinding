@@ -1,6 +1,6 @@
 use bsp_path_finding::{
     astar::{astar, Path},
-    BSPNode, BSPTree, Face, Portal, Portals, Shape, Side,
+    BSPNode, BSPTree, ClippedFace, Face, Portal, Portals, Shape,
 };
 use macroquad::{color::hsl_to_rgb, prelude::*};
 
@@ -90,7 +90,7 @@ async fn main() {
         Vec2::new(500.0, 200.0),
     ]);
 
-    let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 300.0));
+    let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 320.0));
     let poly2 = Shape::regular_polygon(3, 50.0, Vec2::new(200.0, 100.0));
 
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
@@ -129,30 +129,12 @@ async fn main() {
         let node = tree.locate(start);
         if !node.covered() {
             node.node().draw();
-            portals.get(node.index()).draw()
+            portals.get(node.index()).for_each(|val| val.draw())
         }
 
         tree.draw();
         world.draw();
-        // portals.draw();
-
-        for portal in portals.get(tree.locate(start).index) {
-            let dst = tree.node(portal.dst).unwrap();
-            let src = tree.node(portal.src).unwrap();
-
-            draw_line_dotted(
-                portal.vertices[0],
-                dst.origin(),
-                EDGE_THICKNESS,
-                COLORSCHEME.path,
-            );
-            draw_line_dotted(
-                portal.vertices[1],
-                src.origin(),
-                EDGE_THICKNESS,
-                COLORSCHEME.path,
-            );
-        }
+        portals.draw();
 
         next_frame().await
     }
@@ -223,33 +205,16 @@ impl Draw for BSPNode {
     }
 }
 
-impl Draw for Portal {
+impl<'a> Draw for Portal<'a> {
     fn draw(&self) {
         let a = self.vertices[1];
         let b = self.vertices[0];
 
         draw_line_dotted(a, b, VERTEX_RADIUS, COLORSCHEME.edge);
-
-        if self.sides()[0] == Side::Front {
-            draw_circle(
-                self.vertices[0].x,
-                self.vertices[0].y,
-                VERTEX_RADIUS,
-                COLORSCHEME.edge,
-            );
-        }
-        if self.sides()[1] == Side::Front {
-            draw_circle(
-                self.vertices[1].x,
-                self.vertices[1].y,
-                VERTEX_RADIUS,
-                COLORSCHEME.edge,
-            );
-        }
     }
 }
 
-impl Draw for &[Portal] {
+impl Draw for &[ClippedFace] {
     fn draw(&self) {
         for portal in *self {
             portal.draw();
