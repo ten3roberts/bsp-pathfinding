@@ -32,8 +32,9 @@ impl<'a> Portal<'a> {
     }
 
     // Returns true if the line is contained on the surface of the portal
-    pub(crate) fn try_clip(&self, start: Vec2, end: Vec2) -> Option<Vec2> {
-        let p = face_intersect(self.into_tuple(), start, (end - start).perp());
+    pub(crate) fn try_clip(&self, start: Vec2, end: Vec2, margin: f32) -> Option<Vec2> {
+        let (l, r) = self.apply_margin(margin);
+        let p = face_intersect((l, r), start, (end - start).perp());
 
         // let rel = (p - self.vertices[0]).dot(self.vertices[1] - self.vertices[0]);
         if p.distance > 0.0 && p.distance < 1.0 {
@@ -41,6 +42,27 @@ impl<'a> Portal<'a> {
         } else {
             None
         }
+    }
+
+    pub(crate) fn clip(&self, start: Vec2, end: Vec2, margin: f32) -> Vec2 {
+        let (l, r) = self.apply_margin(margin);
+        let p = face_intersect((l, r), start, (end - start).perp());
+
+        // let rel = (p - self.vertices[0]).dot(self.vertices[1] - self.vertices[0]);
+        if p.distance < 0.0 {
+            l
+        } else if p.distance > 1.0 {
+            r
+        } else {
+            p.point
+        }
+    }
+
+    pub fn apply_margin(&self, margin: f32) -> (Vec2, Vec2) {
+        let dir = (self.vertices[1] - self.vertices[0]).normalize();
+        let l = self.vertices[0] + margin * dir;
+        let r = self.vertices[1] - margin * dir;
+        (l, r)
     }
 }
 

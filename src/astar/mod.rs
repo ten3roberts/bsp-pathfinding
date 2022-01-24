@@ -90,16 +90,10 @@ impl<'a> Backtrace<'a> {
         }
     }
 
-    fn new(
-        node: NodeIndex,
-        portal: Portal<'a>,
-        point: Vec2,
-        prev: &Backtrace,
-        heuristic: f32,
-    ) -> Self {
+    fn new(portal: Portal<'a>, point: Vec2, prev: &Backtrace, heuristic: f32) -> Self {
         let start_cost = prev.start_cost + point.distance(prev.point);
         Self {
-            node,
+            node: portal.dst(),
             portal: Some(portal),
             point,
             prev: Some(prev.node),
@@ -127,12 +121,18 @@ impl<'a> Ord for Backtrace<'a> {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub struct SearchInfo {
+    pub agent_radius: f32,
+}
+
 pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
     tree: &BSPTree,
     portals: &Portals,
     start: Vec2,
     end: Vec2,
     heuristic: F,
+    info: SearchInfo,
 ) -> Option<Path> {
     let mut open = BinaryHeap::new();
     let start_node = tree.locate(start);
@@ -158,7 +158,6 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 
     // Expand the node with the lowest total cost
     while let Some(current) = open.pop() {
-        // Skip edge if dst has already been visited
         if closed.contains(&current.node) {
             continue;
         }
@@ -167,55 +166,56 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // Generate backtrace and terminate
         if current.node == end_node {
             // shorten_path(current.node, &mut backtraces);
-            return Some(backtrace(portals, end, current.node, backtraces));
+            let mut path = backtrace(tree, end, current.node, backtraces, info.agent_radius);
+            shorten(tree, portals, &mut path, info.agent_radius);
+            return Some(path);
         }
 
+        let end_rel = end - current.point;
+
         // Add all edges to the open list and update backtraces
-        let portals = portals
-            .get(current.node)
-            .map(|portal| {
-                assert_eq!(portal.src(), current.node);
+        let portals = portals.get(current.node).filter_map(|portal| {
+            if portal.length() < 2.0 * info.agent_radius
+                || portal.dst() == current.node
+                || closed.contains(&portal.dst())
+            {
+                return None;
+            }
+            assert_eq!(portal.src(), current.node);
 
-                let mid = portal.midpoint();
+            let mid = portal.midpoint();
 
-                // Calculate cost based on current position
-                // Try both ends of the portal
-                [
-                    Backtrace::new(
-                        portal.dst(),
-                        portal,
-                        portal.vertices[0],
-                        &current,
-                        (heuristic)(portal.vertices[0], end),
-                    ),
-                    Backtrace::new(
-                        portal.dst(),
-                        portal,
-                        portal.vertices[1],
-                        &current,
-                        (heuristic)(portal.vertices[1], end),
-                    ),
-                    Backtrace::new(portal.dst(), portal, mid, &current, (heuristic)(mid, end)),
-                ]
-            })
-            .flatten()
-            .map(|backtrace| {
-                // Update backtrace
-                // If the cost to this node is lower than previosuly found,
-                // overwrite with the new backtrace.
-                match backtraces.entry(backtrace.node).unwrap() {
-                    Entry::Occupied(mut val) => {
-                        if val.get().total_cost > backtrace.total_cost {
-                            val.insert(backtrace);
-                        }
-                    }
-                    Entry::Vacant(entry) => {
-                        entry.insert(backtrace);
+            let dir = (portal.vertices[1] - portal.vertices[0]).normalize();
+            let p = if end_rel.dot(mid - current.point) > 0.0 {
+                portal.clip(current.point, end, info.agent_radius)
+            } else if end_rel.dot(dir) > 0.0 {
+                portal.vertices[1]
+            } else {
+                portal.vertices[0]
+            };
+
+            // let p = portal.vertices[0];
+
+            let backtrace = Backtrace::new(portal, p, &current, (heuristic)(p, end));
+
+            // Update backtrace
+            // If the cost to this node is lower than previosuly found,
+            // overwrite with the new backtrace.
+            match backtraces.entry(backtrace.node).unwrap() {
+                Entry::Occupied(mut val) => {
+                    if val.get().total_cost > backtrace.total_cost {
+                        val.insert(backtrace);
+                    } else {
+                        return None;
                     }
                 }
+                Entry::Vacant(entry) => {
+                    entry.insert(backtrace);
+                }
+            }
 
-                backtrace
-            });
+            Some(backtrace)
+        });
 
         // Add the edges
         open.extend(portals);
@@ -228,16 +228,27 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 }
 
 fn backtrace(
-    portals: &Portals,
+    tree: &BSPTree,
     end: Vec2,
     mut current: NodeIndex,
     backtraces: SecondaryMap<NodeIndex, Backtrace>,
+    agent_radius: f32,
 ) -> Path {
     let mut path = Path::new(vec![WayPoint::new(end, None)]);
     loop {
         let node = backtraces[current];
+
+        let p = if let Some(portal) = node.portal {
+            let src_normal = tree.node(portal.src()).unwrap().normal();
+            let dst_normal = tree.node(portal.dst()).unwrap().normal();
+            let avg = (src_normal + dst_normal).normalize();
+            node.point + avg * agent_radius
+        } else {
+            node.point
+        };
+
         path.push(WayPoint::new(
-            node.point,
+            p,
             node.portal.as_ref().map(Portal::portal_ref),
         ));
 
@@ -250,11 +261,10 @@ fn backtrace(
     }
 
     path.reverse();
-    shorten(portals, &mut path);
     path
 }
 
-fn shorten(portals: &Portals, path: &mut [WayPoint]) -> bool {
+fn shorten(tree: &BSPTree, portals: &Portals, path: &mut [WayPoint], agent_radius: f32) -> bool {
     if path.len() < 3 {
         return true;
     }
@@ -265,17 +275,21 @@ fn shorten(portals: &Portals, path: &mut [WayPoint]) -> bool {
     if let Some(portal) = b.portal {
         let portal = portals.from_ref(portal);
         // c was directly visible from a
-        if let Some(p) = portal.try_clip(a.point, c.point) {
+        if let Some(p) = portal.try_clip(a.point, c.point, agent_radius) {
             let prev = b.point;
+
             path[1].point = p;
             // Try to shorten the next strip.
             // If successful, retry shortening for this strip
-            if prev.distance_squared(p) > TOLERANCE && shorten(portals, &mut path[1..]) {
-                shorten(portals, path);
+            if prev.distance_squared(p) > TOLERANCE
+                && shorten(tree, portals, &mut path[1..], agent_radius)
+            {
+                shorten(tree, portals, path, agent_radius);
             }
+
             return true;
         }
     }
 
-    shorten(portals, &mut path[1..])
+    shorten(tree, portals, &mut path[1..], agent_radius)
 }

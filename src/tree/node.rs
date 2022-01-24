@@ -181,14 +181,11 @@ impl BSPNode {
                         < TOLERANCE
                 {
                     front.sides[1] = Side::Front;
-                    back.sides[1] = Side::Back;
+                    back.sides[0] = Side::Back;
                 }
                 if root_side == Side::Back {
-                    // back.sides = [Side::Front, Side::Front];
                     front.sides[0] = Side::Front;
                     front.sides[1] = Side::Front;
-                    // back.sides[0] = Side::Front;
-                    // back.sides[0] = Side::Front;
                 }
 
                 let mut result = Self::clip(index, nodes, front, root_side);

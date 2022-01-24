@@ -1,5 +1,5 @@
 use bsp_path_finding::{
-    astar::{astar, Path},
+    astar::{self, astar, Path},
     BSPNode, BSPTree, ClippedFace, Face, Portal, Portals, Shape,
 };
 use macroquad::{color::hsl_to_rgb, prelude::*};
@@ -128,7 +128,16 @@ async fn main() {
         draw_circle(end.x, end.y, POINT_RADIUS, COLORSCHEME.end);
 
         // Find the path
-        let path = astar(&tree, &portals, start, end, |cur, end| cur.distance(end));
+        let path = astar(
+            &tree,
+            &portals,
+            start,
+            end,
+            |cur, end| cur.distance(end),
+            astar::SearchInfo {
+                agent_radius: POINT_RADIUS,
+            },
+        );
 
         if let Some(path) = path {
             path.draw();
