@@ -87,8 +87,10 @@ async fn main() {
     let tri1 = Shape::new(&[
         Vec2::new(600.0, 100.0),
         Vec2::new(650.0, 200.0),
-        Vec2::new(500.0, 200.0),
+        Vec2::new(550.0, 200.0),
     ]);
+
+    let mut depth = 10;
 
     let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 320.0));
     let poly2 = Shape::regular_polygon(3, 50.0, Vec2::new(200.0, 100.0));
@@ -116,6 +118,12 @@ async fn main() {
             end = pos;
         }
 
+        if is_key_pressed(KeyCode::L) {
+            depth += 1;
+        } else if depth > 0 && is_key_pressed(KeyCode::H) {
+            depth -= 1;
+        }
+
         draw_circle(start.x, start.y, POINT_RADIUS, COLORSCHEME.start);
         draw_circle(end.x, end.y, POINT_RADIUS, COLORSCHEME.end);
 
@@ -126,15 +134,13 @@ async fn main() {
             path.draw();
         }
 
-        let node = tree.locate(start);
-        if !node.covered() {
-            node.node().draw();
-            portals.get(node.index()).for_each(|val| val.draw())
-        }
-
-        tree.draw();
+        tree.descendants()
+            .filter(|(_, val)| val.depth() < depth)
+            .for_each(|(_, val)| val.draw());
         world.draw();
-        portals.draw();
+        if depth > 0 {
+            portals.draw();
+        }
 
         next_frame().await
     }
@@ -143,8 +149,7 @@ async fn main() {
 const THICKNESS: f32 = 3.0;
 const POINT_RADIUS: f32 = 10.0;
 const VERTEX_RADIUS: f32 = 6.0;
-const EDGE_THICKNESS: f32 = 4.0;
-const PATH_THICKNESS: f32 = 6.0;
+const PATH_THICKNESS: f32 = 4.0;
 const NORMAL_LEN: f32 = 32.0;
 const ARROW_LEN: f32 = 8.0;
 
@@ -194,6 +199,9 @@ impl Draw for BSPNode {
         let normal_perp = Vec2::new(normal.y, -normal.x);
 
         draw_line(origin.x, origin.y, end.x, end.y, THICKNESS, color);
+
+        draw_circle(self.min().x, self.min().y, VERTEX_RADIUS, color);
+        draw_circle(self.max().x, self.max().y, VERTEX_RADIUS, color);
 
         // Draw arrow head
         draw_triangle(

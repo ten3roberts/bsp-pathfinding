@@ -38,13 +38,13 @@ impl ClippedFace {
             [
                 Self::new(
                     [self.vertices[0], intersection.point],
-                    [self.sides[0], Side::Front],
+                    self.sides,
                     self.src,
                     self.dst,
                 ),
                 Self::new(
-                    [intersection.point, self.vertices[1]],
-                    [Side::Back, self.sides[1]],
+                    [self.vertices[1], intersection.point],
+                    [self.sides[1], self.sides[0]],
                     self.src,
                     self.dst,
                 ),
@@ -54,13 +54,13 @@ impl ClippedFace {
             [
                 Self::new(
                     [self.vertices[1], intersection.point],
-                    [self.sides[1], Side::Front],
+                    [self.sides[1], self.sides[0]],
                     self.src,
                     self.dst,
                 ),
                 Self::new(
                     [self.vertices[0], intersection.point],
-                    [self.sides[0], Side::Back],
+                    self.sides,
                     self.src,
                     self.dst,
                 ),
@@ -154,7 +154,6 @@ impl Portals {
                 .map(|val| val.as_ref())
                 .unwrap_or_default()
                 .iter(),
-            src: index,
         }
     }
 
@@ -177,7 +176,6 @@ impl Portals {
 pub struct PortalIter<'a> {
     faces: &'a [Face],
     iter: slice::Iter<'a, PortalRef>,
-    src: NodeIndex,
 }
 
 impl<'a> Iterator for PortalIter<'a> {
@@ -212,11 +210,10 @@ impl<'a> Iterator for PortalsIter<'a> {
     type Item = PortalIter<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (src, portals) = self.inner.next()?;
+        let (_, portals) = self.inner.next()?;
         Some(PortalIter {
             faces: self.faces,
             iter: portals.iter(),
-            src,
         })
     }
 }

@@ -1,4 +1,4 @@
-use std::ops::{Deref, Div};
+use std::ops::Deref;
 
 use glam::Vec2;
 
@@ -36,7 +36,6 @@ impl<'a> Portal<'a> {
         let p = face_intersect(self.into_tuple(), start, (end - start).perp());
 
         // let rel = (p - self.vertices[0]).dot(self.vertices[1] - self.vertices[0]);
-        dbg!(p, (self.vertices[1] - self.vertices[0]).length());
         if p.distance > 0.0 && p.distance < 1.0 {
             Some(p.point)
         } else {

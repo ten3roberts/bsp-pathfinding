@@ -167,33 +167,35 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // Generate backtrace and terminate
         if current.node == end_node {
             // shorten_path(current.node, &mut backtraces);
-            eprintln!("Found path");
             return Some(backtrace(portals, end, current.node, backtraces));
         }
 
         // Add all edges to the open list and update backtraces
         let portals = portals
             .get(current.node)
-            .map(|edge| {
-                assert_eq!(edge.src(), current.node);
+            .map(|portal| {
+                assert_eq!(portal.src(), current.node);
+
+                let mid = portal.midpoint();
 
                 // Calculate cost based on current position
                 // Try both ends of the portal
                 [
                     Backtrace::new(
-                        edge.dst(),
-                        edge,
-                        edge.vertices[0],
+                        portal.dst(),
+                        portal,
+                        portal.vertices[0],
                         &current,
-                        (heuristic)(edge.vertices[0], end),
+                        (heuristic)(portal.vertices[0], end),
                     ),
                     Backtrace::new(
-                        edge.dst(),
-                        edge,
-                        edge.vertices[1],
+                        portal.dst(),
+                        portal,
+                        portal.vertices[1],
                         &current,
-                        (heuristic)(edge.vertices[1], end),
+                        (heuristic)(portal.vertices[1], end),
                     ),
+                    Backtrace::new(portal.dst(), portal, mid, &current, (heuristic)(mid, end)),
                 ]
             })
             .flatten()
@@ -248,23 +250,8 @@ fn backtrace(
     }
 
     path.reverse();
-    eprintln!("Backtraced");
     shorten(portals, &mut path);
     path
-}
-
-pub fn shorten_(portals: &Portals, path: &mut Path) {
-    for i in 0..path.len() - 2 {
-        let path = &mut path[i..];
-
-        if let Some(portal) = path[1].portal {
-            let portal = portals.from_ref(portal);
-            if let Some(p) = portal.try_clip(path[0].point, path[2].point) {
-                path[1].point = p;
-                eprintln!("Shortening");
-            }
-        }
-    }
 }
 
 fn shorten(portals: &Portals, path: &mut [WayPoint]) -> bool {
@@ -281,7 +268,6 @@ fn shorten(portals: &Portals, path: &mut [WayPoint]) -> bool {
         if let Some(p) = portal.try_clip(a.point, c.point) {
             let prev = b.point;
             path[1].point = p;
-            eprintln!("Shortening");
             // Try to shorten the next strip.
             // If successful, retry shortening for this strip
             if prev.distance_squared(p) > TOLERANCE && shorten(portals, &mut path[1..]) {

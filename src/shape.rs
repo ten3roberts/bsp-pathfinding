@@ -65,6 +65,11 @@ impl Face {
         Self { normal, vertices }
     }
 
+    // Return the length of the face
+    pub fn length(&self) -> f32 {
+        (self.vertices[0] - self.vertices[1]).length()
+    }
+
     /// Get the face's vertices.
     pub fn vertices(&self) -> [Vec2; 2] {
         self.vertices
@@ -97,10 +102,18 @@ impl Face {
 
     /// Splits the face around `p`
     pub fn split(&self, p: Vec2) -> [Self; 2] {
-        [
-            Face::new([p, self.vertices[0]]),
-            Face::new([self.vertices[1], p]),
-        ]
+        let a = (self.vertices[0] - p).dot(self.normal);
+        if a >= -TOLERANCE {
+            [
+                Face::new([p, self.vertices[0]]),
+                Face::new([self.vertices[1], p]),
+            ]
+        } else {
+            [
+                Face::new([self.vertices[1], p]),
+                Face::new([p, self.vertices[0]]),
+            ]
+        }
     }
 
     pub fn midpoint(&self) -> Vec2 {
@@ -165,10 +178,7 @@ mod tests {
 
         let normals = [-Vec2::Y, Vec2::X, Vec2::Y, -Vec2::X];
 
-        assert!(faces
-            .map(|val| val.normal)
-            .inspect(|val| eprintln!("Normal: {:?}", val))
-            .eq(normals));
+        assert!(faces.map(|val| val.normal).eq(normals));
     }
 }
 
