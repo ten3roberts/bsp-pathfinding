@@ -1,3 +1,5 @@
+use std::ops::Index;
+
 use glam::Vec2;
 use slotmap::*;
 
@@ -39,8 +41,8 @@ impl BSPTree {
             r = r.max(val);
         });
 
-        l -= Vec2::splat(100.0);
-        r += Vec2::splat(100.0);
+        l -= Vec2::splat(10.0);
+        r += Vec2::splat(10.0);
 
         let mut nodes = SlotMap::with_key();
         let root = BSPNode::new(&mut nodes, &faces, 0)?;
@@ -106,6 +108,10 @@ impl BSPTree {
 
     pub fn generate_portals<'a>(&self) -> Vec<ClippedFace> {
         let clipping_planes = vec![
+            // Face::new([self.l, Vec2::new(self.l.x, self.r.y)]),
+            // Face::new([Vec2::new(self.l.x, self.r.y), self.r]),
+            // Face::new([self.r, Vec2::new(self.r.x, self.l.y)]),
+            // Face::new([Vec2::new(self.r.x, self.l.y), self.l]),
             Face::new([Vec2::new(self.l.x, self.r.y), self.l]),
             Face::new([self.l, Vec2::new(self.r.x, self.l.y)]),
             Face::new([Vec2::new(self.r.x, self.l.y), self.r]),
@@ -149,5 +155,13 @@ impl<'a> NodePayload<'a> {
     /// Get the node payload's depth.
     pub fn depth(&self) -> Vec2 {
         self.depth
+    }
+}
+
+impl Index<NodeIndex> for BSPTree {
+    type Output = BSPNode;
+
+    fn index(&self, index: NodeIndex) -> &Self::Output {
+        self.node(index).unwrap()
     }
 }

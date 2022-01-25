@@ -54,7 +54,7 @@ impl Shape {
 
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 pub struct Face {
-    pub normal: Vec2,
+    pub(crate) normal: Vec2,
     pub vertices: [Vec2; 2],
 }
 
@@ -70,6 +70,10 @@ impl Face {
         (self.vertices[0] - self.vertices[1]).length()
     }
 
+    pub fn length_squared(&self) -> f32 {
+        (self.vertices[0] - self.vertices[1]).length_squared()
+    }
+
     /// Get the face's vertices.
     pub fn vertices(&self) -> [Vec2; 2] {
         self.vertices
@@ -80,6 +84,7 @@ impl Face {
     }
 
     /// Get the face's normal.
+    #[inline]
     pub fn normal(&self) -> Vec2 {
         self.normal
     }
@@ -105,8 +110,8 @@ impl Face {
         let a = (self.vertices[0] - p).dot(self.normal);
         if a >= -TOLERANCE {
             [
-                Face::new([p, self.vertices[0]]),
-                Face::new([self.vertices[1], p]),
+                Face::new([self.vertices[0], p]),
+                Face::new([p, self.vertices[1]]),
             ]
         } else {
             [
@@ -118,6 +123,18 @@ impl Face {
 
     pub fn midpoint(&self) -> Vec2 {
         (self.vertices[0] + self.vertices[1]) / 2.0
+    }
+
+    /// Returns true if `other` is completely contained wihtin self
+    pub fn contains(&self, other: &Self) -> bool {
+        let dir = self.vertices[1] - self.vertices[0];
+
+        let a = (other.vertices[0] - self.vertices[0]).dot(dir);
+        let b = (other.vertices[1] - self.vertices[0]).dot(dir);
+
+        let len = dir.length_squared();
+        dbg!(a, b);
+        a >= -TOLERANCE && b * b <= len + TOLERANCE || b >= -TOLERANCE && a * a <= len + TOLERANCE
     }
 }
 

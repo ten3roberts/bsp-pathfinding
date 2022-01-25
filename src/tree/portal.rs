@@ -26,6 +26,11 @@ impl<'a> Portal<'a> {
         self.portal_ref.src
     }
 
+    /// Returns the normal which points into the portal
+    pub fn normal(&self) -> Vec2 {
+        self.portal_ref.normal
+    }
+
     /// Get the portal's face.
     pub fn face(&self) -> &Face {
         self.face
@@ -80,4 +85,14 @@ pub struct PortalRef {
     pub(crate) src: NodeIndex,
     pub(crate) dst: NodeIndex,
     pub(crate) face: usize,
+    // Normal may be different than the face due to the normal pointing through
+    // the portal
+    pub(crate) normal: Vec2,
+}
+
+impl PortalRef {
+    /// Returns the normal which points into the portal
+    pub fn normal(&self) -> Vec2 {
+        self.normal
+    }
 }

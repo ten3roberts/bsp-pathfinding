@@ -1,6 +1,6 @@
 use bsp_path_finding::{
     astar::{self, astar, Path},
-    BSPNode, BSPTree, ClippedFace, Face, Portal, Portals, Shape,
+    BSPNode, BSPTree, Face, Portal, Portals, Shape,
 };
 use macroquad::{color::hsl_to_rgb, prelude::*};
 
@@ -79,8 +79,8 @@ fn window_conf() -> Conf {
     }
 }
 
-#[macroquad::main(window_conf)]
-async fn main() {
+#[allow(dead_code)]
+fn spawn_scene_1() -> Vec<Face> {
     let rect1 = Shape::rect(Vec2::new(200.0, 100.0), Vec2::new(200.0, 300.0));
     let rect2 = Shape::rect(Vec2::new(50.0, 200.0), Vec2::new(230.0, 450.0));
 
@@ -90,17 +90,45 @@ async fn main() {
         Vec2::new(550.0, 200.0),
     ]);
 
-    let mut depth = 10;
-
     let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 320.0));
     let poly2 = Shape::regular_polygon(3, 50.0, Vec2::new(200.0, 100.0));
+
+    [rect1, rect2, tri1, poly1, poly2]
+        .iter()
+        .flatten()
+        .collect()
+}
+
+#[allow(dead_code)]
+fn spawn_scene_2() -> Vec<Face> {
+    vec![
+        Face::new([Vec2::new(800.0, 30.0), Vec2::new(30.0, 30.0)]),
+        Face::new([Vec2::new(200.0, 30.0), Vec2::new(200.0, 400.0)]),
+        Face::new([Vec2::new(200.0, 400.0), Vec2::new(30.0, 400.0)]),
+        Face::new([Vec2::new(300.0, 300.0), Vec2::new(300.0, 30.0)]),
+        Face::new([Vec2::new(500.0, 300.0), Vec2::new(300.0, 300.0)]),
+        Face::new([Vec2::new(500.0, 30.0), Vec2::new(500.0, 300.0)]),
+        Face::new([Vec2::new(550.0, 300.0), Vec2::new(550.0, 30.0)]),
+        Face::new([Vec2::new(750.0, 30.0), Vec2::new(550.0, 300.0)]),
+        Face::new([Vec2::new(750.0, 500.0), Vec2::new(750.0, 30.0)]),
+        Face::new([Vec2::new(30.0, 500.0), Vec2::new(800.0, 500.0)]),
+        // Box in the lower mid
+        Face::new([Vec2::new(400.0, 500.0), Vec2::new(400.0, 400.0)]),
+        Face::new([Vec2::new(400.0, 400.0), Vec2::new(500.0, 400.0)]),
+        Face::new([Vec2::new(500.0, 400.0), Vec2::new(500.0, 500.0)]),
+    ]
+}
+
+#[macroquad::main(window_conf)]
+async fn main() {
+    let world = spawn_scene_1();
 
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
-    let world = &[rect1, rect2, tri1, poly1, poly2];
+    let tree = BSPTree::new(world.iter().cloned()).expect("Existent faces");
 
-    let tree = BSPTree::new(world.iter().flat_map(|val| val.faces())).expect("Existent faces");
+    let mut depth = 10;
 
     let portals = Portals::from_tree(&tree);
     loop {
@@ -139,16 +167,25 @@ async fn main() {
             },
         );
 
-        if let Some(path) = path {
-            path.draw();
-        }
-
         tree.descendants()
             .filter(|(_, val)| val.depth() < depth)
             .for_each(|(_, val)| val.draw());
+
         world.draw();
         if depth > 0 {
             portals.draw();
+        }
+
+        for portal in portals.get(tree.locate(start).index()) {
+            draw_arrow(
+                portal.midpoint(),
+                portal.midpoint() + portal.normal() * 10.0,
+                COLORSCHEME.edge,
+            );
+        }
+
+        if let Some(path) = path {
+            path.draw();
         }
 
         next_frame().await
@@ -158,6 +195,7 @@ async fn main() {
 const THICKNESS: f32 = 3.0;
 const POINT_RADIUS: f32 = 10.0;
 const VERTEX_RADIUS: f32 = 6.0;
+const EDGE_RADIUS: f32 = 4.0;
 const PATH_THICKNESS: f32 = 4.0;
 const NORMAL_LEN: f32 = 32.0;
 const ARROW_LEN: f32 = 8.0;
@@ -191,6 +229,12 @@ impl Draw for [Shape] {
     }
 }
 
+impl Draw for [Face] {
+    fn draw(&self) {
+        self.iter().for_each(|val| val.draw())
+    }
+}
+
 impl Draw for BSPTree {
     fn draw(&self) {
         self.descendants().for_each(|(_, val)| val.draw())
@@ -205,21 +249,23 @@ impl Draw for BSPNode {
         let color = (COLORSCHEME.bsp_plane)(self.depth());
 
         let end = origin + normal * NORMAL_LEN;
-        let normal_perp = Vec2::new(normal.y, -normal.x);
-
-        draw_line(origin.x, origin.y, end.x, end.y, THICKNESS, color);
-
-        draw_circle(self.min().x, self.min().y, VERTEX_RADIUS, color);
-        draw_circle(self.max().x, self.max().y, VERTEX_RADIUS, color);
-
-        // Draw arrow head
-        draw_triangle(
-            end + normal * ARROW_LEN,
-            end + normal_perp * ARROW_LEN,
-            end - normal_perp * ARROW_LEN,
-            color,
-        );
+        draw_arrow(origin, end, color);
     }
+}
+
+fn draw_arrow(start: Vec2, end: Vec2, color: Color) {
+    draw_line(start.x, start.y, end.x, end.y, THICKNESS, color);
+
+    let dir = (end - start).normalize();
+    let dir_perp = dir.perp();
+
+    // Draw arrow head
+    draw_triangle(
+        end + dir * ARROW_LEN,
+        end + dir_perp * ARROW_LEN,
+        end - dir_perp * ARROW_LEN,
+        color,
+    );
 }
 
 impl<'a> Draw for Portal<'a> {
@@ -227,17 +273,12 @@ impl<'a> Draw for Portal<'a> {
         let a = self.vertices[1];
         let b = self.vertices[0];
 
-        draw_line_dotted(a, b, VERTEX_RADIUS, COLORSCHEME.edge);
+        draw_line_dotted(a, b, EDGE_RADIUS, COLORSCHEME.edge);
+        draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.edge);
+        draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.edge);
     }
 }
 
-impl Draw for &[ClippedFace] {
-    fn draw(&self) {
-        for portal in *self {
-            portal.draw();
-        }
-    }
-}
 impl Draw for Portals {
     fn draw(&self) {
         for portal in self.iter().flatten() {

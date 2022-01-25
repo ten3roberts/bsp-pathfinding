@@ -29,38 +29,46 @@ impl ClippedFace {
     }
 
     /// Split the face. The first face is in front
-    pub fn split(&self, p: Vec2, normal: Vec2) -> [Self; 2] {
+    pub fn split(&self, p: Vec2, normal: Vec2, double_planar: bool) -> [Self; 2] {
         let intersection = face_intersect(self.into_tuple(), p, normal);
         let a = (self.vertices[0] - p).dot(normal);
 
+        let front = if double_planar {
+            Side::Back
+        } else {
+            Side::Front
+        };
+
         // a is in front
         if a >= -TOLERANCE {
+            dbg!("a");
             [
                 Self::new(
                     [self.vertices[0], intersection.point],
-                    self.sides,
+                    [self.sides[0], front],
                     self.src,
                     self.dst,
                 ),
                 Self::new(
                     [intersection.point, self.vertices[1]],
-                    [self.sides[0], self.sides[1]],
+                    [self.sides[0], Side::Back],
                     self.src,
                     self.dst,
                 ),
             ]
         } else {
             // a is behind
+            dbg!("b");
             [
                 Self::new(
-                    [self.vertices[1], intersection.point],
-                    [self.sides[1], self.sides[0]],
+                    [intersection.point, self.vertices[1]],
+                    [front, self.sides[1]],
                     self.src,
                     self.dst,
                 ),
                 Self::new(
-                    [intersection.point, self.vertices[0]],
-                    [self.sides[1], self.sides[0]],
+                    [self.vertices[0], intersection.point],
+                    [self.sides[0], Side::Back],
                     self.src,
                     self.dst,
                 ),
@@ -119,6 +127,7 @@ impl Portals {
         portals
     }
 
+    /// Adds a new portal for both src and dst
     pub fn add(&mut self, portal: ClippedFace) {
         let face = self.faces.len();
         self.faces.push(portal.face);
@@ -132,6 +141,7 @@ impl Portals {
             .push(PortalRef {
                 dst: portal.dst,
                 src: portal.src,
+                normal: portal.normal(),
                 face,
             });
         self.inner
@@ -141,6 +151,7 @@ impl Portals {
             .push(PortalRef {
                 dst: portal.src,
                 src: portal.dst,
+                normal: -portal.normal(),
                 face,
             });
     }

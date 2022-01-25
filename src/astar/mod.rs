@@ -166,7 +166,7 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // Generate backtrace and terminate
         if current.node == end_node {
             // shorten_path(current.node, &mut backtraces);
-            let mut path = backtrace(tree, end, current.node, backtraces, info.agent_radius);
+            let mut path = backtrace(end, current.node, backtraces, info.agent_radius);
             shorten(tree, portals, &mut path, info.agent_radius);
             return Some(path);
         }
@@ -185,16 +185,18 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 
             let mid = portal.midpoint();
 
-            let dir = (portal.vertices[1] - portal.vertices[0]).normalize();
+            // Distance to each of the nodes
+            let (p1, p2) = portal.apply_margin(info.agent_radius);
+            let p1_dist = (heuristic)(p1, end);
+            let p2_dist = (heuristic)(p2, end);
+
             let p = if end_rel.dot(mid - current.point) > 0.0 {
                 portal.clip(current.point, end, info.agent_radius)
-            } else if end_rel.dot(dir) > 0.0 {
-                portal.vertices[1]
+            } else if p1_dist < p2_dist {
+                p1
             } else {
-                portal.vertices[0]
+                p2
             };
-
-            // let p = portal.vertices[0];
 
             let backtrace = Backtrace::new(portal, p, &current, (heuristic)(p, end));
 
@@ -228,7 +230,6 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 }
 
 fn backtrace(
-    tree: &BSPTree,
     end: Vec2,
     mut current: NodeIndex,
     backtraces: SecondaryMap<NodeIndex, Backtrace>,
@@ -239,10 +240,7 @@ fn backtrace(
         let node = backtraces[current];
 
         let p = if let Some(portal) = node.portal {
-            let src_normal = tree.node(portal.src()).unwrap().normal();
-            let dst_normal = tree.node(portal.dst()).unwrap().normal();
-            let avg = (src_normal + dst_normal).normalize();
-            node.point + avg * agent_radius
+            node.point - portal.face.normal * agent_radius
         } else {
             node.point
         };
@@ -279,11 +277,14 @@ fn shorten(tree: &BSPTree, portals: &Portals, path: &mut [WayPoint], agent_radiu
             let prev = b.point;
 
             path[1].point = p;
+
+            if prev.distance_squared(p) < TOLERANCE {
+                return false;
+            }
+
             // Try to shorten the next strip.
             // If successful, retry shortening for this strip
-            if prev.distance_squared(p) > TOLERANCE
-                && shorten(tree, portals, &mut path[1..], agent_radius)
-            {
+            if shorten(tree, portals, &mut path[1..], agent_radius) {
                 shorten(tree, portals, path, agent_radius);
             }
 
