@@ -15,6 +15,10 @@ pub struct BSPNode {
     front: Option<NodeIndex>,
     back: Option<NodeIndex>,
 
+    faces: Vec<Face>,
+
+    face: Face,
+
     depth: usize,
     // Is true if this node contains normals which face each other. This
     // indicates that this is both a front and a back face
@@ -28,9 +32,16 @@ impl BSPNode {
         let (current, faces) = faces.split_first()?;
         // let dir = (current.vertices[1] - current.vertices[0]).normalize();
         let p = current.vertices[0];
+        let dir = current.dir();
 
         let mut front = Vec::new();
+        let mut coplanar = vec![*current];
         let mut back = Vec::new();
+
+        let mut min = current.vertices[0];
+        let mut min_val = (current.vertices[0] - p).dot(dir);
+        let mut max = current.vertices[1];
+        let mut max_val = (current.vertices[1] - p).dot(dir);
 
         let normal = current.normal;
 
@@ -42,6 +53,20 @@ impl BSPNode {
                 Side::Front => front.push(*face),
                 Side::Back => back.push(*face),
                 Side::Coplanar => {
+                    eprintln!("coplanar: {:?} - {}", face, current.normal);
+                    for v in face.vertices {
+                        let distance = (v - p).dot(dir);
+                        if distance > 0.0 && distance > max_val {
+                            max = v;
+                            max_val = distance;
+                        }
+
+                        if distance < 0.0 && distance < min_val {
+                            min = v;
+                            min_val = distance;
+                        }
+                    }
+                    coplanar.push(*face);
                     double_planar = double_planar || face.normal.dot(current.normal) < 0.0
                 }
                 Side::Intersecting => {
@@ -49,7 +74,10 @@ impl BSPNode {
                     dbg!("Intersecting");
                     let intersect = face_intersect(face.into_tuple(), p, normal);
 
-                    let [a, b] = face.split(intersect.point);
+                    let [a, b] = face.split(intersect.point, normal);
+
+                    assert_eq!(a.side_of(p, normal), Side::Front);
+                    assert_eq!(b.side_of(p, normal), Side::Back);
 
                     assert!(a.normal.dot(face.normal) > 0.0);
                     assert!(b.normal.dot(face.normal) > 0.0);
@@ -65,9 +93,15 @@ impl BSPNode {
 
         assert!(current.normal.is_normalized());
 
+        let face = Face::new([min, max]);
+        dbg!(face.normal.dot(normal));
+        assert!(face.normal.dot(normal) > 1.0 - TOLERANCE);
+
         let node = Self {
             // Any point will do
             origin: current.midpoint(),
+            face,
+            faces: coplanar,
             normal: current.normal,
             double_planar,
             front,
@@ -132,13 +166,33 @@ impl BSPNode {
         root_side: Side,
     ) -> Vec<ClippedFace> {
         let node = &nodes[index];
-        let side = portal.side_of(node.origin, node.normal);
 
+        let side = portal.side_of(node.origin, node.normal);
         // Allow back faces to override front
-        if side == Side::Front && root_side == Side::Back {
-            portal.sides = [Side::Front; 2];
+        let a = (portal.vertices[0] - node.origin).dot(node.normal);
+        let b = (portal.vertices[1] - node.origin).dot(node.normal);
+
+        // a is touching the plane
+        let relative_side = if node.double_planar { Side::Back } else { side };
+        if a.abs() < TOLERANCE {
+            portal.sides[0] = relative_side;
+        }
+        // b is touching the plane
+        else if b.abs() < TOLERANCE {
+            portal.sides[1] = relative_side;
         }
 
+        Self::clip_new(index, nodes, portal, side, root_side)
+    }
+
+    fn clip_new(
+        index: NodeIndex,
+        nodes: &Nodes,
+        mut portal: ClippedFace,
+        side: Side,
+        root_side: Side,
+    ) -> Vec<ClippedFace> {
+        let node = &nodes[index];
         // The face is entirely in front of the node
         match (side, node.front, node.back) {
             (Side::Coplanar, Some(front), Some(back)) => {
@@ -155,13 +209,29 @@ impl BSPNode {
             (Side::Back, _, Some(back)) => Self::clip(back, nodes, portal, root_side),
             (Side::Intersecting, _, _) => {
                 // Split the face at the intersection
-                let [front, back] = portal.split(node.origin, node.normal, node.double_planar);
+                dbg!(node.double_planar, node.face.adjacent(portal.face()));
+                let [front, back] = if node.face.adjacent(portal.face()) {
+                    // portal.split(node.origin, node.normal, node.double_planar)
+                    portal.split_nondestructive(node.origin, node.normal)
+                } else {
+                    portal.split_nondestructive(node.origin, node.normal)
+                };
+
+                assert_eq!(front.side_of(node.origin(), node.normal), Side::Front);
+                assert_eq!(back.side_of(node.origin(), node.normal), Side::Back);
 
                 assert!(front.normal.dot(portal.normal) > 0.0);
                 assert!(back.normal.dot(portal.normal) > 0.0);
 
-                let mut result = Self::clip(index, nodes, front, root_side);
-                result.append(&mut Self::clip(index, nodes, back, root_side));
+                let mut result = Self::clip_new(index, nodes, front, Side::Front, root_side);
+
+                result.append(&mut Self::clip_new(
+                    index,
+                    nodes,
+                    back,
+                    Side::Back,
+                    root_side,
+                ));
                 result
             }
             _ => {
@@ -194,7 +264,11 @@ impl BSPNode {
                 return;
             }
 
-            let side = if (val.vertices[0] - node.origin()).dot(val.normal()) > 0.0 {
+            let side = if node.double_planar {
+                Side::Back
+            } else if (val.vertices[0] - node.origin()).dot(val.normal()) > 0.0
+                || !val.adjacent(node.face)
+            {
                 Side::Front
             } else {
                 Side::Back
@@ -212,15 +286,18 @@ impl BSPNode {
 
         let face = Face::new([min.point, max.point]);
 
-        if node.back().is_some() {
-            let portal = ClippedFace::new(face.vertices, [min_side, max_side], index, index);
+        let portal = ClippedFace::new(face.vertices, [Side::Front, Side::Front], index, index);
 
-            result.extend(
-                Self::clip(index, nodes, portal, Side::Front)
-                    .into_iter()
-                    .filter(|val| val.src != val.dst && val.sides == [Side::Front; 2]),
-            );
-        }
+        result.extend(
+            Self::clip(index, nodes, portal, Side::Front)
+                .into_iter()
+                .filter(|val| {
+                    val.src != val.dst
+                        && val.sides == [Side::Front; 2]
+                        // && !node.faces.iter().any(|face| face.contains(val))
+                    && !node.face.contains(val)
+                }),
+        );
 
         // Add the current nodes clip plane before recursing
         // result.push(portal);

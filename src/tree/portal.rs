@@ -42,7 +42,7 @@ impl<'a> Portal<'a> {
         let p = face_intersect((l, r), start, (end - start).perp());
 
         // let rel = (p - self.vertices[0]).dot(self.vertices[1] - self.vertices[0]);
-        if p.distance > 0.0 && p.distance < 1.0 {
+        if p.distance > 0.0 && p.distance < self.length() {
             Some(p.point)
         } else {
             None
@@ -64,7 +64,7 @@ impl<'a> Portal<'a> {
     }
 
     pub fn apply_margin(&self, margin: f32) -> (Vec2, Vec2) {
-        let dir = (self.vertices[1] - self.vertices[0]).normalize();
+        let dir = self.dir();
         let l = self.vertices[0] + margin * dir;
         let r = self.vertices[1] - margin * dir;
         (l, r)

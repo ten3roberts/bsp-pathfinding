@@ -28,8 +28,47 @@ impl ClippedFace {
         }
     }
 
+    pub(crate) fn split_nondestructive(&self, p: Vec2, normal: Vec2) -> [Self; 2] {
+        let intersection = face_intersect(self.into_tuple(), p, normal);
+        let a = (self.vertices[0] - p).dot(normal);
+
+        // a is in front
+        if a >= -TOLERANCE {
+            [
+                Self::new(
+                    [self.vertices[0], intersection.point],
+                    [Side::Front, Side::Front],
+                    self.src,
+                    self.dst,
+                ),
+                Self::new(
+                    [intersection.point, self.vertices[1]],
+                    [Side::Front, Side::Front],
+                    self.src,
+                    self.dst,
+                ),
+            ]
+        } else {
+            // a is behind
+            [
+                Self::new(
+                    [intersection.point, self.vertices[1]],
+                    [Side::Front, Side::Front],
+                    self.src,
+                    self.dst,
+                ),
+                Self::new(
+                    [self.vertices[0], intersection.point],
+                    [Side::Front, Side::Front],
+                    self.src,
+                    self.dst,
+                ),
+            ]
+        }
+    }
+
     /// Split the face. The first face is in front
-    pub fn split(&self, p: Vec2, normal: Vec2, double_planar: bool) -> [Self; 2] {
+    pub(crate) fn split(&self, p: Vec2, normal: Vec2, double_planar: bool) -> [Self; 2] {
         let intersection = face_intersect(self.into_tuple(), p, normal);
         let a = (self.vertices[0] - p).dot(normal);
 
@@ -41,7 +80,6 @@ impl ClippedFace {
 
         // a is in front
         if a >= -TOLERANCE {
-            dbg!("a");
             [
                 Self::new(
                     [self.vertices[0], intersection.point],
@@ -51,14 +89,13 @@ impl ClippedFace {
                 ),
                 Self::new(
                     [intersection.point, self.vertices[1]],
-                    [self.sides[0], Side::Back],
+                    [Side::Back, self.sides[1]],
                     self.src,
                     self.dst,
                 ),
             ]
         } else {
             // a is behind
-            dbg!("b");
             [
                 Self::new(
                     [intersection.point, self.vertices[1]],
@@ -89,6 +126,11 @@ impl ClippedFace {
     /// Get the portal's sides.
     pub fn sides(&self) -> [Side; 2] {
         self.sides
+    }
+
+    /// Get the clipped face's face.
+    pub fn face(&self) -> Face {
+        self.face
     }
 }
 

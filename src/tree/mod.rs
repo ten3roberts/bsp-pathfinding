@@ -1,6 +1,7 @@
 use std::ops::Index;
 
 use glam::Vec2;
+use rand::{prelude::SliceRandom, Rng};
 use slotmap::*;
 
 use crate::Face;
@@ -30,8 +31,11 @@ pub struct BSPTree {
 impl BSPTree {
     /// Constructs a new tree.
     /// Returns None if there are not faces, and root construction was not possible
-    pub fn new(faces: impl Iterator<Item = Face>) -> Option<Self> {
-        let faces: Vec<_> = faces.collect();
+    pub fn new(faces: impl Iterator<Item = Face>, shuffle: Option<&mut impl Rng>) -> Option<Self> {
+        let mut faces: Vec<_> = faces.collect();
+        if let Some(rng) = shuffle {
+            faces.shuffle(rng);
+        }
 
         let mut l = Vec2::new(f32::MAX, f32::MAX);
         let mut r = Vec2::new(f32::MIN, f32::MIN);

@@ -106,8 +106,8 @@ impl Face {
     }
 
     /// Splits the face around `p`
-    pub fn split(&self, p: Vec2) -> [Self; 2] {
-        let a = (self.vertices[0] - p).dot(self.normal);
+    pub fn split(&self, p: Vec2, normal: Vec2) -> [Self; 2] {
+        let a = (self.vertices[0] - p).dot(normal);
         if a >= -TOLERANCE {
             [
                 Face::new([self.vertices[0], p]),
@@ -115,10 +115,20 @@ impl Face {
             ]
         } else {
             [
-                Face::new([self.vertices[1], p]),
-                Face::new([p, self.vertices[0]]),
+                Face::new([p, self.vertices[1]]),
+                Face::new([self.vertices[0], p]),
             ]
         }
+    }
+
+    /// Returns true if the face is touching the other face
+    pub fn adjacent(&self, other: Face) -> bool {
+        let p = other.midpoint();
+        let a = (self.vertices[0] - p).dot(other.normal);
+        let b = (self.vertices[1] - p).dot(other.normal);
+
+        // a.signum() != b.signum()
+        (a < -TOLERANCE && b > TOLERANCE) || (b < -TOLERANCE && a > TOLERANCE)
     }
 
     pub fn midpoint(&self) -> Vec2 {
@@ -127,14 +137,19 @@ impl Face {
 
     /// Returns true if `other` is completely contained wihtin self
     pub fn contains(&self, other: &Self) -> bool {
-        let dir = self.vertices[1] - self.vertices[0];
+        let dir = self.dir();
 
         let a = (other.vertices[0] - self.vertices[0]).dot(dir);
         let b = (other.vertices[1] - self.vertices[0]).dot(dir);
 
-        let len = dir.length_squared();
+        let len = self.length_squared();
         dbg!(a, b);
-        a >= -TOLERANCE && b * b <= len + TOLERANCE || b >= -TOLERANCE && a * a <= len + TOLERANCE
+        (a > -TOLERANCE && b > a && b * b < len + TOLERANCE)
+            || (b > -TOLERANCE && a > b && a * a < len + TOLERANCE)
+    }
+
+    pub fn dir(&self) -> Vec2 {
+        (self.vertices[1] - self.vertices[0]).normalize()
     }
 }
 

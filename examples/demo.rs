@@ -2,7 +2,15 @@ use bsp_path_finding::{
     astar::{self, astar, Path},
     BSPNode, BSPTree, Face, Portal, Portals, Shape,
 };
-use macroquad::{color::hsl_to_rgb, prelude::*};
+use macroquad::{
+    color::hsl_to_rgb,
+    prelude::{
+        clear_background, draw_circle, draw_line, draw_triangle, is_key_pressed,
+        is_mouse_button_down, mouse_position, next_frame, screen_height, screen_width, Color, Conf,
+        KeyCode, MouseButton, Vec2, BLACK, BLUE, DARKGREEN, DARKPURPLE, GRAY, RED, WHITE,
+    },
+};
+use rand::{rngs::StdRng, SeedableRng};
 
 const WIDTH: i32 = 800;
 const HEIGHT: i32 = 600;
@@ -90,7 +98,7 @@ fn spawn_scene_1() -> Vec<Face> {
         Vec2::new(550.0, 200.0),
     ]);
 
-    let poly1 = Shape::regular_polygon(5, 80.0, Vec2::new(500.0, 320.0));
+    let poly1 = Shape::regular_polygon(5, 50.0, Vec2::new(500.0, 320.0));
     let poly2 = Shape::regular_polygon(3, 50.0, Vec2::new(200.0, 100.0));
 
     [rect1, rect2, tri1, poly1, poly2]
@@ -126,7 +134,8 @@ async fn main() {
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
-    let tree = BSPTree::new(world.iter().cloned()).expect("Existent faces");
+    let tree = BSPTree::new(world.iter().cloned(), Some(&mut StdRng::seed_from_u64(1)))
+        .expect("Existent faces");
 
     let mut depth = 10;
 
@@ -172,16 +181,17 @@ async fn main() {
             .for_each(|(_, val)| val.draw());
 
         world.draw();
+
         if depth > 0 {
             portals.draw();
-        }
 
-        for portal in portals.get(tree.locate(start).index()) {
-            draw_arrow(
-                portal.midpoint(),
-                portal.midpoint() + portal.normal() * 10.0,
-                COLORSCHEME.edge,
-            );
+            for portal in portals.get(tree.locate(start).index()) {
+                draw_arrow(
+                    portal.midpoint(),
+                    portal.midpoint() + portal.normal() * 10.0,
+                    COLORSCHEME.edge,
+                );
+            }
         }
 
         if let Some(path) = path {

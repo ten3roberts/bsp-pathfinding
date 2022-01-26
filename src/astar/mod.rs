@@ -167,7 +167,7 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         if current.node == end_node {
             // shorten_path(current.node, &mut backtraces);
             let mut path = backtrace(end, current.node, backtraces, info.agent_radius);
-            shorten(tree, portals, &mut path, info.agent_radius);
+            // shorten(tree, portals, &mut path, info.agent_radius);
             return Some(path);
         }
 
