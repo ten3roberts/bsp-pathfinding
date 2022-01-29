@@ -144,6 +144,8 @@ impl Deref for ClippedFace {
 
 type NodePortals = SmallVec<[PortalRef; 4]>;
 
+/// Declares portals which are surfaces connecting two partitioning planes,
+/// [crate::BSPNode].
 pub struct Portals {
     inner: SecondaryMap<NodeIndex, NodePortals>,
     faces: Vec<Face>,
@@ -158,19 +160,11 @@ impl Portals {
     }
 
     pub fn generate(&mut self, tree: &BSPTree) {
-        for portal in tree.generate_portals() {
-            self.add(portal)
-        }
-    }
-
-    pub fn from_tree(tree: &BSPTree) -> Self {
-        let mut portals = Self::new();
-        portals.generate(tree);
-        portals
+        self.extend(tree.generate_portals())
     }
 
     /// Adds a new portal for both src and dst
-    pub fn add(&mut self, portal: ClippedFace) {
+    pub fn push(&mut self, portal: ClippedFace) {
         let face = self.faces.len();
         self.faces.push(portal.face);
 
@@ -183,7 +177,7 @@ impl Portals {
             .push(PortalRef {
                 dst: portal.dst,
                 src: portal.src,
-                normal: portal.normal(),
+                normal: -portal.normal(),
                 face,
             });
         self.inner
@@ -193,7 +187,7 @@ impl Portals {
             .push(PortalRef {
                 dst: portal.src,
                 src: portal.dst,
-                normal: -portal.normal(),
+                normal: portal.normal(),
                 face,
             });
     }
@@ -254,6 +248,7 @@ impl<'a> IntoIterator for &'a Portals {
     }
 }
 
+#[doc(hidden)]
 pub struct PortalsIter<'a> {
     faces: &'a [Face],
     inner: Iter<'a, NodeIndex, NodePortals>,
@@ -274,5 +269,15 @@ impl<'a> Iterator for PortalsIter<'a> {
 impl Default for Portals {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Extend<ClippedFace> for Portals {
+    fn extend<T: IntoIterator<Item = ClippedFace>>(&mut self, iter: T) {
+        let iter = iter.into_iter();
+        let cap = self.inner.len() + iter.size_hint().0;
+
+        self.inner.set_capacity(cap);
+        iter.for_each(|val| self.push(val))
     }
 }

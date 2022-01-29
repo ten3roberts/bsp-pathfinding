@@ -17,6 +17,7 @@ mod portals;
 type Nodes = SlotMap<NodeIndex, BSPNode>;
 
 new_key_type! {
+    /// Represent the index of a [crate::BSPNode]
     pub struct NodeIndex;
 }
 /// Defines the tree used for navigation
@@ -31,12 +32,20 @@ pub struct BSPTree {
 impl BSPTree {
     /// Constructs a new tree.
     /// Returns None if there are not faces, and root construction was not possible
-    pub fn new(faces: impl Iterator<Item = Face>, shuffle: Option<&mut impl Rng>) -> Option<Self> {
-        let mut faces: Vec<_> = faces.collect();
-        if let Some(rng) = shuffle {
-            faces.shuffle(rng);
-        }
+    pub fn new(faces: impl Iterator<Item = Face>) -> Option<Self> {
+        let faces: Vec<_> = faces.collect();
 
+        Self::new_inner(faces)
+    }
+
+    pub fn new_shuffle(faces: impl Iterator<Item = Face>, rng: &mut impl Rng) -> Option<Self> {
+        let mut faces: Vec<_> = faces.collect();
+        faces.shuffle(rng);
+
+        Self::new_inner(faces)
+    }
+
+    fn new_inner(faces: Vec<Face>) -> Option<Self> {
         let mut l = Vec2::new(f32::MAX, f32::MAX);
         let mut r = Vec2::new(f32::MIN, f32::MIN);
 
@@ -68,7 +77,7 @@ impl BSPTree {
         self.node(self.root).expect("Root is always present")
     }
 
-    pub fn descendants(&self) -> DescendantsIter {
+    pub fn descendants(&self) -> Descendants {
         BSPNode::descendants(self.root, &self.nodes)
     }
 
@@ -110,24 +119,26 @@ impl BSPTree {
         &self.nodes
     }
 
-    pub fn generate_portals(&self) -> Vec<ClippedFace> {
-        let clipping_planes = vec![
-            // Face::new([self.l, Vec2::new(self.l.x, self.r.y)]),
-            // Face::new([Vec2::new(self.l.x, self.r.y), self.r]),
-            // Face::new([self.r, Vec2::new(self.r.x, self.l.y)]),
-            // Face::new([Vec2::new(self.r.x, self.l.y), self.l]),
+    /// Returns clipping planes which contain the scene
+    pub fn clipping_planes(&self) -> [Face; 4] {
+        [
             Face::new([Vec2::new(self.l.x, self.r.y), self.l]),
             Face::new([self.l, Vec2::new(self.r.x, self.l.y)]),
             Face::new([Vec2::new(self.r.x, self.l.y), self.r]),
             Face::new([self.r, Vec2::new(self.l.x, self.r.y)]),
-        ];
+        ]
+    }
+
+    pub fn generate_portals(&self) -> Vec<ClippedFace> {
+        let clipping_planes = self.clipping_planes().into_iter().collect();
 
         let mut portals = Vec::new();
-        BSPNode::generate_portals(self.root, &self.nodes, clipping_planes, &mut portals);
+        BSPNode::generate_portals(self.root, &self.nodes, &clipping_planes, &mut portals);
         portals
     }
 }
 
+/// Represents the result of [crate::BSPTree::locate]
 pub struct NodePayload<'a> {
     pub index: NodeIndex,
     pub node: &'a BSPNode,

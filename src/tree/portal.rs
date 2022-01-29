@@ -5,6 +5,7 @@ use glam::Vec2;
 use crate::{util::face_intersect, Face, NodeIndex};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// Represents a surface connecting two nodes
 pub struct Portal<'a> {
     pub(crate) face: &'a Face,
 
@@ -79,8 +80,8 @@ impl<'a> Deref for Portal<'a> {
     }
 }
 
-#[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq)]
+/// References a portal
 pub struct PortalRef {
     pub(crate) src: NodeIndex,
     pub(crate) dst: NodeIndex,

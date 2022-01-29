@@ -1,3 +1,4 @@
+use core::slice;
 use std::{
     collections::{BinaryHeap, HashSet},
     ops::{Deref, DerefMut},
@@ -19,6 +20,16 @@ pub struct WayPoint {
     portal: Option<PortalRef>,
 }
 
+impl<'a> IntoIterator for &'a Path {
+    type Item = &'a WayPoint;
+
+    type IntoIter = slice::Iter<'a, WayPoint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.points.iter()
+    }
+}
+
 impl Deref for WayPoint {
     type Target = Vec2;
 
@@ -30,6 +41,16 @@ impl Deref for WayPoint {
 impl WayPoint {
     pub fn new(point: Vec2, portal: Option<PortalRef>) -> Self {
         Self { point, portal }
+    }
+
+    /// Get the way point's point.
+    pub fn point(&self) -> Vec2 {
+        self.point
+    }
+
+    /// Get the way point's portal.
+    pub fn portal(&self) -> Option<PortalRef> {
+        self.portal
     }
 }
 
@@ -49,6 +70,11 @@ impl Path {
 
     pub fn append(&mut self, other: &mut Self) {
         self.points.append(&mut other.points)
+    }
+
+    /// Creates a path using the euclidian path
+    pub fn euclidian(start: Vec2, end: Vec2) -> Path {
+        Path::new(vec![WayPoint::new(start, None), WayPoint::new(end, None)])
     }
 }
 

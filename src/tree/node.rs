@@ -1,4 +1,5 @@
 use glam::Vec2;
+use rpds::Vector;
 
 use crate::{
     util::{face_intersect, face_intersect_dir, Intersect},
@@ -8,6 +9,12 @@ use crate::{
 use super::{NodeIndex, Nodes};
 
 #[derive(Debug)]
+/// Represents  a single node in the binary tree.
+/// The node constitutes of a splitting plane and children behind and in front
+/// of the plane.
+///
+/// A node can be double planar, which means that the partitioning plane
+/// contains two faces with opposite facing normals.
 pub struct BSPNode {
     origin: Vec2,
     normal: Vec2,
@@ -138,8 +145,8 @@ impl BSPNode {
         self.origin
     }
 
-    pub fn descendants(index: NodeIndex, nodes: &Nodes) -> DescendantsIter {
-        DescendantsIter {
+    pub fn descendants(index: NodeIndex, nodes: &Nodes) -> Descendants {
+        Descendants {
             nodes,
             stack: vec![index],
         }
@@ -239,8 +246,8 @@ impl BSPNode {
     pub fn generate_portals(
         index: NodeIndex,
         nodes: &Nodes,
-        mut clipping_planes: Vec<Face>,
-        result: &mut Vec<ClippedFace>,
+        clipping_planes: &Vector<Face>,
+        result: &mut impl Extend<ClippedFace>,
     ) {
         let node = &nodes[index];
         let dir = Vec2::new(node.normal.y, -node.normal.x);
@@ -292,17 +299,17 @@ impl BSPNode {
 
         // Add the current nodes clip plane before recursing
         // result.push(portal);
-        clipping_planes.push(face);
+        let clipping_planes = clipping_planes.push_back(face);
 
         // Clone the clipping faces since the descendants of the children will
         // also be added to the clipping planes,
         // and we want to keep the clipping planes separated for subtrees.
         if let Some(child) = node.front {
-            Self::generate_portals(child, nodes, clipping_planes.clone(), result);
+            Self::generate_portals(child, nodes, &clipping_planes, result);
         }
 
         if let Some(child) = node.back {
-            Self::generate_portals(child, nodes, clipping_planes.clone(), result);
+            Self::generate_portals(child, nodes, &clipping_planes, result);
         }
     }
 
@@ -314,15 +321,20 @@ impl BSPNode {
     pub fn double_planar(&self) -> bool {
         self.double_planar
     }
+
+    /// Get the bspnode's face.
+    pub fn face(&self) -> Face {
+        self.face
+    }
 }
 
-pub struct DescendantsIter<'a> {
+pub struct Descendants<'a> {
     nodes: &'a Nodes,
 
     stack: Vec<NodeIndex>,
 }
 
-impl<'a> Iterator for DescendantsIter<'a> {
+impl<'a> Iterator for Descendants<'a> {
     type Item = (NodeIndex, &'a BSPNode);
 
     fn next(&mut self) -> Option<Self::Item> {

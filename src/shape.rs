@@ -4,7 +4,9 @@ use glam::Vec2;
 
 use crate::TOLERANCE;
 
-/// Defines a 2d shape
+/// Defines a collection of faces.
+/// This struct is not neccesary to use, but helps in constructing squares and
+/// other primitives.
 #[derive(Default, Debug, Clone)]
 pub struct Shape {
     vertices: Vec<Vec2>,
@@ -53,6 +55,8 @@ impl Shape {
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
+/// A two dimensional face of two vertices.
+/// Uses counterclockwise winding order to calculate a normal
 pub struct Face {
     pub(crate) normal: Vec2,
     pub vertices: [Vec2; 2],
@@ -172,6 +176,7 @@ impl<'a> IntoIterator for &'a Face {
     }
 }
 
+#[doc(hidden)]
 pub struct Faces<'a> {
     vertices: &'a [Vec2],
     current: usize,

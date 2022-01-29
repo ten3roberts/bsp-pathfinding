@@ -1,6 +1,6 @@
-use bsp_path_finding::{
-    astar::{self, astar, Path},
-    BSPNode, BSPTree, Face, Portal, Portals, Shape,
+use bsp_pathfinding::{
+    astar::{Path, SearchInfo},
+    heuristics, BSPNode, BSPTree, Face, NavigationContext, Portal, Portals, Shape,
 };
 use macroquad::{
     color::hsl_to_rgb,
@@ -134,12 +134,10 @@ async fn main() {
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
-    let tree = BSPTree::new(world.iter().cloned(), Some(&mut StdRng::seed_from_u64(7)))
-        .expect("Existent faces");
+    let nav = NavigationContext::new_shuffle(world.iter().cloned(), &mut StdRng::seed_from_u64(8));
 
     let mut depth = 10;
 
-    let portals = Portals::from_tree(&tree);
     loop {
         clear_background(COLORSCHEME.background);
 
@@ -163,24 +161,23 @@ async fn main() {
 
         draw_circle(start.x, start.y, POINT_RADIUS, COLORSCHEME.start);
         draw_circle(end.x, end.y, POINT_RADIUS, COLORSCHEME.end);
-
-        // Find the path
-        let path = astar(
-            &tree,
-            &portals,
+        let path = nav.find_path(
             start,
             end,
-            |cur, end| cur.distance(end),
-            astar::SearchInfo {
+            heuristics::euclidiean,
+            SearchInfo {
                 agent_radius: POINT_RADIUS,
             },
         );
 
+        let tree = nav.tree().unwrap();
         tree.descendants()
             .filter(|(_, val)| val.depth() < depth)
             .for_each(|(_, val)| val.draw());
 
         world.draw();
+
+        let portals = nav.portals();
 
         if depth > 0 {
             portals.draw();
@@ -188,7 +185,7 @@ async fn main() {
             for portal in portals.get(tree.locate(start).index()) {
                 draw_arrow(
                     portal.midpoint(),
-                    portal.midpoint() + portal.face().normal() * 10.0,
+                    portal.midpoint() + portal.normal() * 10.0,
                     COLORSCHEME.edge,
                 );
             }

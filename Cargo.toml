@@ -1,5 +1,5 @@
 [package]
-name = "bsp-path-finding"
+name = "bsp-pathfinding"
 version = "0.1.0"
 edition = "2021"
 description = "Runtime path finding using Binary Spatial Partitioning"
@@ -11,6 +11,7 @@ license-file = "LICENSE"
 glam = "0.14"
 ordered-float = "2.8.0"
 rand = "0.8.4"
+rpds = "0.11.0"
 slotmap = "1.0.6"
 smallvec = "1.7.0"
 
