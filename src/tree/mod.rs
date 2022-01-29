@@ -49,7 +49,7 @@ impl BSPTree {
         r += Vec2::splat(10.0);
 
         let mut nodes = SlotMap::with_key();
-        let root = BSPNode::new(&mut nodes, &faces, 0)?;
+        let root = BSPNode::from_faces(&mut nodes, &faces, 0)?;
 
         Some(Self { nodes, root, l, r })
     }
@@ -110,7 +110,7 @@ impl BSPTree {
         &self.nodes
     }
 
-    pub fn generate_portals<'a>(&self) -> Vec<ClippedFace> {
+    pub fn generate_portals(&self) -> Vec<ClippedFace> {
         let clipping_planes = vec![
             // Face::new([self.l, Vec2::new(self.l.x, self.r.y)]),
             // Face::new([Vec2::new(self.l.x, self.r.y), self.r]),
@@ -123,12 +123,7 @@ impl BSPTree {
         ];
 
         let mut portals = Vec::new();
-        BSPNode::generate_portals(
-            self.root,
-            &self.nodes,
-            clipping_planes.clone(),
-            &mut portals,
-        );
+        BSPNode::generate_portals(self.root, &self.nodes, clipping_planes, &mut portals);
         portals
     }
 }

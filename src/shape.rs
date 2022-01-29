@@ -143,7 +143,6 @@ impl Face {
         let b = (other.vertices[1] - self.vertices[0]).dot(dir);
 
         let len = self.length_squared();
-        dbg!(a, b);
         (a > -TOLERANCE && b > a && b * b < len + TOLERANCE)
             || (b > -TOLERANCE && a > b && a * a < len + TOLERANCE)
     }

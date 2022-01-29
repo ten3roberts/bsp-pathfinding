@@ -42,7 +42,7 @@ impl<'a> Portal<'a> {
         let p = face_intersect((l, r), start, (end - start).perp());
 
         // let rel = (p - self.vertices[0]).dot(self.vertices[1] - self.vertices[0]);
-        if p.distance > 0.0 && p.distance < self.length() {
+        if p.distance > 0.0 && p.distance < 1.0 {
             Some(p.point)
         } else {
             None
@@ -75,7 +75,7 @@ impl<'a> Deref for Portal<'a> {
     type Target = Face;
 
     fn deref(&self) -> &Self::Target {
-        &self.face
+        self.face
     }
 }
 

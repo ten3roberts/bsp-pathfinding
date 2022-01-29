@@ -134,7 +134,7 @@ async fn main() {
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
-    let tree = BSPTree::new(world.iter().cloned(), Some(&mut StdRng::seed_from_u64(1)))
+    let tree = BSPTree::new(world.iter().cloned(), Some(&mut StdRng::seed_from_u64(7)))
         .expect("Existent faces");
 
     let mut depth = 10;
@@ -188,7 +188,7 @@ async fn main() {
             for portal in portals.get(tree.locate(start).index()) {
                 draw_arrow(
                     portal.midpoint(),
-                    portal.midpoint() + portal.normal() * 10.0,
+                    portal.midpoint() + portal.face().normal() * 10.0,
                     COLORSCHEME.edge,
                 );
             }

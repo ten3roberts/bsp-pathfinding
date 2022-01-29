@@ -165,9 +165,8 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // End found
         // Generate backtrace and terminate
         if current.node == end_node {
-            // shorten_path(current.node, &mut backtraces);
-            let mut path = backtrace(end, current.node, backtraces, info.agent_radius);
-            // shorten(tree, portals, &mut path, info.agent_radius);
+            let mut path = backtrace(end, current.node, backtraces);
+            shorten(tree, portals, &mut path, info.agent_radius);
             return Some(path);
         }
 
@@ -233,20 +232,20 @@ fn backtrace(
     end: Vec2,
     mut current: NodeIndex,
     backtraces: SecondaryMap<NodeIndex, Backtrace>,
-    agent_radius: f32,
 ) -> Path {
     let mut path = Path::new(vec![WayPoint::new(end, None)]);
     loop {
+        // Backtrace backwards
         let node = backtraces[current];
 
-        let p = if let Some(portal) = node.portal {
-            node.point - portal.face.normal * agent_radius
-        } else {
-            node.point
-        };
+        //         let p = if let (Some(portal), Some(prev)) = (node.portal, node.prev) {
+        //             node.point + (portal.face.normal * agent_radius)
+        //         } else {
+        //             node.point
+        //         };
 
         path.push(WayPoint::new(
-            p,
+            node.point,
             node.portal.as_ref().map(Portal::portal_ref),
         ));
 

@@ -15,8 +15,6 @@ pub struct BSPNode {
     front: Option<NodeIndex>,
     back: Option<NodeIndex>,
 
-    faces: Vec<Face>,
-
     face: Face,
 
     depth: usize,
@@ -28,14 +26,13 @@ pub struct BSPNode {
 impl BSPNode {
     /// Creates a new BSPNode and inserts it into nodes.
     /// Returns None if there were not faces to create a node from
-    pub fn new(nodes: &mut Nodes, faces: &[Face], depth: usize) -> Option<NodeIndex> {
+    pub fn from_faces(nodes: &mut Nodes, faces: &[Face], depth: usize) -> Option<NodeIndex> {
         let (current, faces) = faces.split_first()?;
         // let dir = (current.vertices[1] - current.vertices[0]).normalize();
         let p = current.vertices[0];
         let dir = current.dir();
 
         let mut front = Vec::new();
-        let mut coplanar = vec![*current];
         let mut back = Vec::new();
 
         let mut min = current.vertices[0];
@@ -53,7 +50,6 @@ impl BSPNode {
                 Side::Front => front.push(*face),
                 Side::Back => back.push(*face),
                 Side::Coplanar => {
-                    eprintln!("coplanar: {:?} - {}", face, current.normal);
                     for v in face.vertices {
                         let distance = (v - p).dot(dir);
                         if distance > 0.0 && distance > max_val {
@@ -66,12 +62,10 @@ impl BSPNode {
                             min_val = distance;
                         }
                     }
-                    coplanar.push(*face);
                     double_planar = double_planar || face.normal.dot(current.normal) < 0.0
                 }
                 Side::Intersecting => {
                     // Split the line in two and repeat the process
-                    dbg!("Intersecting");
                     let intersect = face_intersect(face.into_tuple(), p, normal);
 
                     let [a, b] = face.split(intersect.point, normal);
@@ -88,20 +82,18 @@ impl BSPNode {
             }
         }
 
-        let front = Self::new(nodes, &mut front, depth + 1);
-        let back = Self::new(nodes, &mut back, depth + 1);
+        let front = Self::from_faces(nodes, &front, depth + 1);
+        let back = Self::from_faces(nodes, &back, depth + 1);
 
         assert!(current.normal.is_normalized());
 
         let face = Face::new([min, max]);
-        dbg!(face.normal.dot(normal));
         assert!(face.normal.dot(normal) > 1.0 - TOLERANCE);
 
         let node = Self {
             // Any point will do
             origin: current.midpoint(),
             face,
-            faces: coplanar,
             normal: current.normal,
             double_planar,
             front,
@@ -146,7 +138,7 @@ impl BSPNode {
         self.origin
     }
 
-    pub fn descendants<'a>(index: NodeIndex, nodes: &'a Nodes) -> DescendantsIter<'a> {
+    pub fn descendants(index: NodeIndex, nodes: &Nodes) -> DescendantsIter {
         DescendantsIter {
             nodes,
             stack: vec![index],
@@ -209,10 +201,9 @@ impl BSPNode {
             (Side::Back, _, Some(back)) => Self::clip(back, nodes, portal, root_side),
             (Side::Intersecting, _, _) => {
                 // Split the face at the intersection
-                dbg!(node.double_planar, node.face.adjacent(portal.face()));
                 let [front, back] = if node.face.adjacent(portal.face()) {
-                    // portal.split(node.origin, node.normal, node.double_planar)
-                    portal.split_nondestructive(node.origin, node.normal)
+                    portal.split(node.origin, node.normal, node.double_planar)
+                    // portal.split_nondestructive(node.origin, node.normal)
                 } else {
                     portal.split_nondestructive(node.origin, node.normal)
                 };
@@ -284,9 +275,9 @@ impl BSPNode {
             }
         });
 
-        let face = Face::new([min.point, max.point]);
+        let face = Face::new([max.point, min.point]);
 
-        let portal = ClippedFace::new(face.vertices, [Side::Front, Side::Front], index, index);
+        let portal = ClippedFace::new(face.vertices, [max_side, min_side], index, index);
 
         result.extend(
             Self::clip(index, nodes, portal, Side::Front)
