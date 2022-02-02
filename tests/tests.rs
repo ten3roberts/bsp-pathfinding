@@ -13,7 +13,7 @@ fn simple() {
     // Create navigational context from the scene
     let nav = NavigationContext::new([square, left, right, top, bottom].iter().flatten());
 
-    // Find a pat
+    // Find a path
     let start = Vec2::new(-100.0, 0.0);
     let end = Vec2::new(100.0, 30.0);
 
