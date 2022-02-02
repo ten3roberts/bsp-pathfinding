@@ -57,6 +57,7 @@ impl Shape {
 #[derive(Default, Debug, Copy, Clone, PartialEq)]
 /// A two dimensional face of two vertices.
 /// Uses counterclockwise winding order to calculate a normal
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 pub struct Face {
     pub(crate) normal: Vec2,
     pub vertices: [Vec2; 2],

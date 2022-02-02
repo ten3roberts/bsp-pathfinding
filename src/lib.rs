@@ -1,4 +1,3 @@
-//! # BSP Path Finding
 //! Provides a path finding search space generation and A* search algorithm
 //! using Binary Spatial Partitioning.
 //!
@@ -8,8 +7,10 @@
 //! The algorithm does not impose any constraints on size or angle of the scene
 //! as is the case for grid or quadtree based approaches.
 //!
-//! ## Usage
+//! # Usage
 //! ```rust
+//! use bsp_pathfinding::*;
+//! use glam::*;
 //! // Define a simple scene
 //! let square = Shape::rect(Vec2::new(50.0, 50.0), Vec2::new(0.0, 0.0));
 //! let left = Shape::rect(Vec2::new(10.0, 200.0), Vec2::new(-200.0, 10.0));
@@ -36,6 +37,7 @@ mod shape;
 mod tree;
 mod util;
 
+pub use astar::*;
 pub use navigation_context::*;
 pub use shape::*;
 pub use tree::*;

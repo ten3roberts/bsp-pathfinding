@@ -82,6 +82,7 @@ impl<'a> Deref for Portal<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 /// References a portal
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 pub struct PortalRef {
     pub(crate) src: NodeIndex,
     pub(crate) dst: NodeIndex,

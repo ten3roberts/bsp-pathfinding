@@ -8,6 +8,7 @@ use crate::{
 
 use super::{NodeIndex, Nodes};
 
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug)]
 /// Represents  a single node in the binary tree.
 /// The node constitutes of a splitting plane and children behind and in front

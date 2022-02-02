@@ -21,6 +21,7 @@ new_key_type! {
     pub struct NodeIndex;
 }
 /// Defines the tree used for navigation
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 pub struct BSPTree {
     nodes: Nodes,
     root: NodeIndex,

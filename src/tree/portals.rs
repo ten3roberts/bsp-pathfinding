@@ -146,6 +146,7 @@ type NodePortals = SmallVec<[PortalRef; 4]>;
 
 /// Declares portals which are surfaces connecting two partitioning planes,
 /// [crate::BSPNode].
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 pub struct Portals {
     inner: SecondaryMap<NodeIndex, NodePortals>,
     faces: Vec<Face>,

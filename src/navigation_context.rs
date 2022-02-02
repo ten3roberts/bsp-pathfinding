@@ -8,6 +8,7 @@ use rand::Rng;
 use crate::{Face, Portals};
 
 /// Contains the graph and edges necessary for path finding
+#[cfg_attr(feature = "serialize", derive(serde::Serialize, serde::Deserialize))]
 pub struct NavigationContext {
     tree: Option<BSPTree>,
     portals: Portals,
