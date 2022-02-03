@@ -1,5 +1,18 @@
+use std::f32::consts::PI;
+
 use bsp_pathfinding::*;
-use glam::Vec2;
+use glam::{Mat3, Vec2};
+
+#[test]
+fn face() {
+    let f = Face::new([-Vec2::X, Vec2::X]);
+    let trans = Mat3::from_scale_angle_translation(Vec2::splat(2.0), PI, Vec2::new(0.0, 1.0));
+
+    let f = f.transform(trans);
+    assert!(f.vertices[0].distance(Vec2::X * 2.0 + Vec2::new(0.0, 1.0)) < 0.01);
+    assert!(f.vertices[1].distance(-Vec2::X * 2.0 + Vec2::new(0.0, 1.0)) < 0.01);
+    assert!(f.normal().distance(Vec2::Y) < 0.01);
+}
 
 #[test]
 fn simple() {

@@ -1,6 +1,6 @@
 use std::{array, f32::consts::TAU};
 
-use glam::Vec2;
+use glam::{Mat3, Vec2};
 
 use crate::TOLERANCE;
 
@@ -92,6 +92,12 @@ impl Face {
     #[inline]
     pub fn normal(&self) -> Vec2 {
         self.normal
+    }
+
+    /// Transforms the face
+    pub fn transform(&self, transform: Mat3) -> Self {
+        let [a, b] = self.vertices;
+        Face::new([transform.transform_point2(a), transform.transform_point2(b)])
     }
 
     /// Returns the side self is in respect to a point and normal
