@@ -1,6 +1,6 @@
 [package]
 name = "bsp-pathfinding"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = [ "Tei Roberts" ]
 documentation = "https://docs.rs/bsp-pathfinding"
