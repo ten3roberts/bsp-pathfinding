@@ -2,6 +2,9 @@
 name = "bsp-pathfinding"
 version = "0.1.0"
 edition = "2021"
+author = "Tei Roberts"
+documentation = "https://docs.rs/bsp-pathfinding"
+repository = "https://github.com/ten3roberts/bsp-pathfinding"
 description = "Runtime path finding using Binary Spatial Partitioning"
 license-file = "LICENSE"
 
