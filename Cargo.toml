@@ -1,6 +1,6 @@
 [package]
 name = "bsp-pathfinding"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = [ "Tei Roberts" ]
 documentation = "https://docs.rs/bsp-pathfinding"
@@ -12,13 +12,13 @@ license-file = "LICENSE"
 
 [dependencies]
 
-glam = "0.14"
-ordered-float = "2.8.0"
+glam = "0.20.2"
+ordered-float = "2.10.0"
 rand = "0.8.4"
 rpds = "0.11.0"
-serde = { version = "1.0", optional = true, features = ["derive"] }
+serde = { version = "1.0.136", optional = true, features = ["derive"] }
 slotmap = "1.0.6"
-smallvec = "1.7.0"
+smallvec = "1.8.0"
 
 [dev-dependencies]
 macroquad = "0.3.13"
