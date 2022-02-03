@@ -1,8 +1,8 @@
 [package]
 name = "bsp-pathfinding"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
-author = "Tei Roberts"
+authors = [ "Tei Roberts" ]
 documentation = "https://docs.rs/bsp-pathfinding"
 repository = "https://github.com/ten3roberts/bsp-pathfinding"
 description = "Runtime path finding using Binary Spatial Partitioning"

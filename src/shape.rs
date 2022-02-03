@@ -167,6 +167,16 @@ impl<'a> IntoIterator for &'a Shape {
     }
 }
 
+impl<'a> IntoIterator for Face {
+    type Item = Vec2;
+
+    type IntoIter = array::IntoIter<Vec2, 2>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.vertices.into_iter()
+    }
+}
+
 impl<'a> IntoIterator for &'a Face {
     type Item = Vec2;
 
