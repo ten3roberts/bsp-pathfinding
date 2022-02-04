@@ -130,7 +130,7 @@ fn spawn_scene_2() -> Vec<Face> {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let world = spawn_scene_2();
+    let world = spawn_scene_1();
 
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
