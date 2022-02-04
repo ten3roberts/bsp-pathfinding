@@ -1,6 +1,6 @@
 use std::{array, f32::consts::TAU};
 
-use glam::{Mat3, Vec2};
+use glam::{Mat3, Mat4, Vec2, Vec3Swizzles};
 
 use crate::TOLERANCE;
 
@@ -21,7 +21,7 @@ impl Shape {
 
     pub fn regular_polygon(sides: usize, radius: f32, origin: Vec2) -> Self {
         let turn = TAU / sides as f32;
-        let vertices = (0..sides)
+        let vertices = (0..=sides)
             .map(|val| {
                 let x = (turn * val as f32).cos();
                 let y = (turn * val as f32).sin();
@@ -40,6 +40,7 @@ impl Shape {
             Vec2::new(half_size.x, -half_size.y) + origin,
             Vec2::new(half_size.x, half_size.y) + origin,
             Vec2::new(-half_size.x, half_size.y) + origin,
+            Vec2::new(-half_size.x, -half_size.y) + origin,
         ];
 
         Self { vertices }
@@ -98,6 +99,14 @@ impl Face {
     pub fn transform(&self, transform: Mat3) -> Self {
         let [a, b] = self.vertices;
         Face::new([transform.transform_point2(a), transform.transform_point2(b)])
+    }
+
+    /// Transforms the face using 3d space using xz plane
+    pub fn transform_3d(&self, transform: Mat4) -> Self {
+        let a = transform.transform_point3(self.vertices[0].extend(0.0).xzy());
+        let b = transform.transform_point3(self.vertices[1].extend(0.0).xzy());
+
+        Self::new([a.xz(), b.xz()])
     }
 
     /// Returns the side self is in respect to a point and normal
@@ -205,12 +214,12 @@ impl<'a> Iterator for Faces<'a> {
 
     // Generate normals from winding
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current == self.len {
+        if self.current + 1 == self.len {
             return None;
         }
 
         let a = self.vertices[self.current];
-        let b = self.vertices[(self.current + 1) % self.len];
+        let b = self.vertices[(self.current + 1)];
 
         self.current += 1;
         Some(Face::new([a, b]))

@@ -96,6 +96,7 @@ fn spawn_scene_1() -> Vec<Face> {
         Vec2::new(600.0, 100.0),
         Vec2::new(650.0, 200.0),
         Vec2::new(550.0, 200.0),
+        Vec2::new(600.0, 100.0),
     ]);
 
     let poly1 = Shape::regular_polygon(5, 50.0, Vec2::new(500.0, 320.0));
