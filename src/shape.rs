@@ -1,6 +1,7 @@
 use std::{array, f32::consts::TAU};
 
 use glam::{Mat3, Mat4, Vec2, Vec3Swizzles};
+use smallvec::{smallvec, SmallVec};
 
 use crate::TOLERANCE;
 
@@ -9,13 +10,13 @@ use crate::TOLERANCE;
 /// other primitives.
 #[derive(Default, Debug, Clone)]
 pub struct Shape {
-    vertices: Vec<Vec2>,
+    vertices: SmallVec<[Vec2; 8]>,
 }
 
 impl Shape {
     pub fn new(vertices: &[Vec2]) -> Self {
         Self {
-            vertices: vertices.to_vec(),
+            vertices: SmallVec::from_slice(vertices),
         }
     }
 
@@ -35,7 +36,7 @@ impl Shape {
 
     pub fn rect(size: Vec2, origin: Vec2) -> Self {
         let half_size = size / 2.0;
-        let vertices = vec![
+        let vertices = smallvec![
             Vec2::new(-half_size.x, -half_size.y) + origin,
             Vec2::new(half_size.x, -half_size.y) + origin,
             Vec2::new(half_size.x, half_size.y) + origin,

@@ -57,7 +57,7 @@ checksum = "bef38d45163c2f1dde094a7dfd33ccf595c92905c8f8f4fdc18d06fb1037718a"
 name = "bsp-pathfinding"
 version = "0.1.6"
 dependencies = [
- "glam 0.20.2",
+ "glam",
  "macroquad",
  "ordered-float",
  "rand",
@@ -164,12 +164,6 @@ name = "glam"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "333928d5eb103c5d4050533cec0384302db6be8ef7d3cebd30ec6a35350353da"
-
-[[package]]
-name = "glam"
-version = "0.20.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4fa84eead97d5412b2a20aed4d66612a97a9e41e08eababdb9ae2bf88667490"
 dependencies = [
  "serde",
 ]
@@ -235,7 +229,7 @@ checksum = "8bbc44698249e98c7aedb8eef94b8806b5d68187c0c3d8c2a0912cb9efab1950"
 dependencies = [
  "bumpalo",
  "fontdue",
- "glam 0.14.0",
+ "glam",
  "image",
  "macroquad_macro",
  "miniquad",

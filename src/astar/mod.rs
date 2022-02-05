@@ -6,12 +6,13 @@ use std::{
 
 use glam::Vec2;
 use slotmap::{secondary::Entry, SecondaryMap};
+use smallvec::SmallVec;
 
 use crate::{BSPTree, NodeIndex, Portal, PortalRef, Portals, TOLERANCE};
 
 #[derive(Debug, Clone, Default)]
 pub struct Path {
-    points: Vec<WayPoint>,
+    points: SmallVec<[WayPoint; 8]>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -55,8 +56,10 @@ impl WayPoint {
 }
 
 impl Path {
-    pub fn new(points: Vec<WayPoint>) -> Self {
-        Self { points }
+    pub fn new(points: impl Into<SmallVec<[WayPoint; 8]>>) -> Self {
+        Self {
+            points: points.into(),
+        }
     }
 
     /// Get a reference to the path's points.

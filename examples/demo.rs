@@ -185,8 +185,8 @@ async fn main() {
 
             for portal in portals.get(tree.locate(start).index()) {
                 draw_arrow(
-                    portal.midpoint(),
-                    portal.midpoint() + portal.normal() * 10.0,
+                    portal.face().midpoint(),
+                    portal.face().midpoint() + portal.normal() * 10.0,
                     COLORSCHEME.edge,
                 );
             }
@@ -278,8 +278,8 @@ fn draw_arrow(start: Vec2, end: Vec2, color: Color) {
 
 impl<'a> Draw for Portal<'a> {
     fn draw(&self) {
-        let a = self.vertices[1];
-        let b = self.vertices[0];
+        let a = self.face().vertices[1];
+        let b = self.face().vertices[0];
 
         draw_line_dotted(a, b, EDGE_RADIUS, COLORSCHEME.edge);
         draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.edge);
