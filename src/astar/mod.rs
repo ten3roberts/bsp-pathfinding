@@ -9,7 +9,7 @@ use slotmap::{secondary::Entry, SecondaryMap};
 
 use crate::{BSPTree, NodeIndex, Portal, PortalRef, Portals, TOLERANCE};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Path {
     points: Vec<WayPoint>,
 }
