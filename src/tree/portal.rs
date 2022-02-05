@@ -65,18 +65,18 @@ impl<'a> Portal<'a> {
     }
 
     pub fn apply_margin(&self, margin: f32) -> (Vec2, Vec2) {
-        let dir = self.dir();
-        let l = self.vertices[0] + margin * dir;
-        let r = self.vertices[1] - margin * dir;
+        let dir = self.face.dir();
+        let l = self.face.vertices[0] + margin * dir;
+        let r = self.face.vertices[1] - margin * dir;
         (l, r)
     }
 }
 
 impl<'a> Deref for Portal<'a> {
-    type Target = Face;
+    type Target = PortalRef;
 
     fn deref(&self) -> &Self::Target {
-        self.face
+        &self.portal_ref
     }
 }
 
@@ -96,5 +96,20 @@ impl PortalRef {
     /// Returns the normal which points into the portal
     pub fn normal(&self) -> Vec2 {
         self.normal
+    }
+
+    /// Get the portal ref's src.
+    pub fn src(&self) -> NodeIndex {
+        self.src
+    }
+
+    /// Get the portal ref's dst.
+    pub fn dst(&self) -> NodeIndex {
+        self.dst
+    }
+
+    /// Get a mutable reference to the portal ref's normal.
+    pub fn normal_mut(&mut self) -> &mut Vec2 {
+        &mut self.normal
     }
 }

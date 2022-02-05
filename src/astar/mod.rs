@@ -200,7 +200,7 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 
         // Add all edges to the open list and update backtraces
         let portals = portals.get(current.node).filter_map(|portal| {
-            if portal.length() < 2.0 * info.agent_radius
+            if portal.face.length() < 2.0 * info.agent_radius
                 || portal.dst() == current.node
                 || closed.contains(&portal.dst())
             {
@@ -208,7 +208,7 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
             }
             assert_eq!(portal.src(), current.node);
 
-            let mid = portal.midpoint();
+            let mid = portal.face.midpoint();
 
             // Distance to each of the nodes
             let (p1, p2) = portal.apply_margin(info.agent_radius);
