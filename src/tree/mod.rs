@@ -104,7 +104,11 @@ impl BSPTree {
                     index,
                     node,
                     covered,
-                    depth: -node.normal() * dot,
+                    depth: if covered {
+                        -node.normal() * dot
+                    } else {
+                        Vec2::ZERO
+                    },
                 };
             }
         }

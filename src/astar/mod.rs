@@ -5,7 +5,7 @@ use std::{
 };
 
 use glam::Vec2;
-use slotmap::{secondary::Entry, SecondaryMap};
+use slotmap::{secondary::Entry, Key, SecondaryMap};
 use smallvec::SmallVec;
 
 use crate::{BSPTree, NodeIndex, Portal, PortalRef, Portals, TOLERANCE};
@@ -18,6 +18,7 @@ pub struct Path {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WayPoint {
     point: Vec2,
+    node: NodeIndex,
     portal: Option<PortalRef>,
 }
 
@@ -40,8 +41,12 @@ impl Deref for WayPoint {
 }
 
 impl WayPoint {
-    pub fn new(point: Vec2, portal: Option<PortalRef>) -> Self {
-        Self { point, portal }
+    pub fn new(point: Vec2, node: NodeIndex, portal: Option<PortalRef>) -> Self {
+        Self {
+            point,
+            node,
+            portal,
+        }
     }
 
     /// Get the way point's point.
@@ -77,7 +82,10 @@ impl Path {
 
     /// Creates a path using the euclidian path
     pub fn euclidian(start: Vec2, end: Vec2) -> Path {
-        Path::new(vec![WayPoint::new(start, None), WayPoint::new(end, None)])
+        Path::new(vec![
+            WayPoint::new(start, NodeIndex::null(), None),
+            WayPoint::new(end, NodeIndex::null(), None),
+        ])
     }
 }
 
@@ -262,7 +270,7 @@ fn backtrace(
     mut current: NodeIndex,
     backtraces: SecondaryMap<NodeIndex, Backtrace>,
 ) -> Path {
-    let mut path = Path::new(vec![WayPoint::new(end, None)]);
+    let mut path = Path::new(vec![WayPoint::new(end, current, None)]);
     loop {
         // Backtrace backwards
         let node = backtraces[current];
@@ -275,6 +283,7 @@ fn backtrace(
 
         path.push(WayPoint::new(
             node.point,
+            node.node,
             node.portal.as_ref().map(Portal::portal_ref),
         ));
 
