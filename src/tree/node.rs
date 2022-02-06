@@ -1,5 +1,6 @@
 use glam::Vec2;
 use rpds::Vector;
+use smallvec::{smallvec, SmallVec};
 
 use crate::{
     util::{face_intersect, face_intersect_dir, Intersect},
@@ -23,7 +24,7 @@ pub struct BSPNode {
     front: Option<NodeIndex>,
     back: Option<NodeIndex>,
 
-    face: Face,
+    faces: SmallVec<[Face; 2]>,
 
     depth: usize,
     // Is true if this node contains normals which face each other. This
@@ -38,15 +39,11 @@ impl BSPNode {
         let (current, faces) = faces.split_first()?;
         // let dir = (current.vertices[1] - current.vertices[0]).normalize();
         let p = current.vertices[0];
-        let dir = current.dir();
 
         let mut front = Vec::new();
         let mut back = Vec::new();
 
-        let mut min = current.vertices[0];
-        let mut min_val = (current.vertices[0] - p).dot(dir);
-        let mut max = current.vertices[1];
-        let mut max_val = (current.vertices[1] - p).dot(dir);
+        let mut coplanar = smallvec![*current];
 
         let normal = current.normal;
 
@@ -58,18 +55,7 @@ impl BSPNode {
                 Side::Front => front.push(*face),
                 Side::Back => back.push(*face),
                 Side::Coplanar => {
-                    for v in face.vertices {
-                        let distance = (v - p).dot(dir);
-                        if distance > 0.0 && distance > max_val {
-                            max = v;
-                            max_val = distance;
-                        }
-
-                        if distance < 0.0 && distance < min_val {
-                            min = v;
-                            min_val = distance;
-                        }
-                    }
+                    coplanar.push(*face);
                     double_planar = double_planar || face.normal.dot(current.normal) < 0.0
                 }
                 Side::Intersecting => {
@@ -95,13 +81,10 @@ impl BSPNode {
 
         assert!(current.normal.is_normalized());
 
-        let face = Face::new([min, max]);
-        assert!(face.normal.dot(normal) > 1.0 - TOLERANCE);
-
         let node = Self {
             // Any point will do
             origin: current.midpoint(),
-            face,
+            faces: coplanar,
             normal: current.normal,
             double_planar,
             front,
@@ -209,12 +192,14 @@ impl BSPNode {
             (Side::Back, _, Some(back)) => Self::clip(back, nodes, portal, root_side),
             (Side::Intersecting, _, _) => {
                 // Split the face at the intersection
-                let [front, back] = if node.face.adjacent(portal.face()) {
-                    portal.split(node.origin, node.normal, node.double_planar)
-                    // portal.split_nondestructive(node.origin, node.normal)
-                } else {
-                    portal.split_nondestructive(node.origin, node.normal)
-                };
+                // let [front, back] = if node.face.adjacent(portal.face()) {
+                // dbg!("Splittind");
+                // todo!();
+                // portal.split(node.origin, node.normal, node.double_planar)
+                // portal.split_nondestructive(node.origin, node.normal)
+                // } else {
+                let [front, back] = portal.split_nondestructive(node.origin, node.normal);
+                // };
 
                 assert_eq!(front.side_of(node.origin(), node.normal), Side::Front);
                 assert_eq!(back.side_of(node.origin(), node.normal), Side::Back);
@@ -265,9 +250,7 @@ impl BSPNode {
 
             let side = if node.double_planar {
                 Side::Back
-            } else if (val.vertices[0] - node.origin()).dot(val.normal()) > 0.0
-                || !val.adjacent(node.face)
-            {
+            } else if (val.vertices[0] - node.origin()).dot(val.normal()) > 0.0 {
                 Side::Front
             } else {
                 Side::Back
@@ -293,8 +276,7 @@ impl BSPNode {
                 .filter(|val| {
                     val.src != val.dst
                         && val.sides == [Side::Front; 2]
-                        // && !node.faces.iter().any(|face| face.contains(val))
-                    && !node.face.contains(val)
+                        && !node.faces.iter().any(|face| face.contains(val))
                 }),
         );
 
@@ -323,9 +305,9 @@ impl BSPNode {
         self.double_planar
     }
 
-    /// Get the bspnode's face.
-    pub fn face(&self) -> Face {
-        self.face
+    /// Get a reference to the bspnode's faces.
+    pub fn faces(&self) -> &[Face] {
+        &self.faces
     }
 }
 

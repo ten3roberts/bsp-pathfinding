@@ -55,9 +55,6 @@ impl BSPTree {
             r = r.max(val);
         });
 
-        l -= Vec2::splat(10.0);
-        r += Vec2::splat(10.0);
-
         let mut nodes = SlotMap::with_key();
         let root = BSPNode::from_faces(&mut nodes, &faces, 0)?;
 

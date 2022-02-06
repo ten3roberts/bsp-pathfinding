@@ -5,9 +5,9 @@ use bsp_pathfinding::{
 use macroquad::{
     color::hsl_to_rgb,
     prelude::{
-        clear_background, draw_circle, draw_line, draw_triangle, is_key_pressed,
+        clear_background, draw_circle, draw_line, draw_triangle, get_char_pressed,
         is_mouse_button_down, mouse_position, next_frame, screen_height, screen_width, Color, Conf,
-        KeyCode, MouseButton, Vec2, BLACK, BLUE, DARKGREEN, DARKPURPLE, GRAY, RED, WHITE,
+        MouseButton, Vec2, BLACK, BLUE, DARKGREEN, DARKPURPLE, GRAY, RED, WHITE,
     },
 };
 use rand::{rngs::StdRng, SeedableRng};
@@ -130,12 +130,16 @@ fn spawn_scene_2() -> Vec<Face> {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let world = spawn_scene_1();
+    let world = spawn_scene_2();
 
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
-    let nav = NavigationContext::new_shuffle(world.iter().cloned(), &mut StdRng::seed_from_u64(8));
+    let mut seed: i64 = 0;
+    let mut nav = NavigationContext::new_shuffle(
+        world.iter().cloned(),
+        &mut StdRng::seed_from_u64(seed as u64),
+    );
 
     let mut depth = 10;
 
@@ -148,18 +152,35 @@ async fn main() {
             start = pos;
         }
 
+        let c = get_char_pressed();
+        match c {
+            Some('r') | Some('R') => {
+                nav = NavigationContext::new_shuffle(
+                    world.iter().cloned(),
+                    &mut StdRng::seed_from_u64(seed as u64),
+                );
+                seed += if c == Some('r') {
+                    1
+                } else if depth > 0 {
+                    -1
+                } else {
+                    0
+                };
+            }
+            Some('l') => {
+                depth += 1;
+            }
+            Some('h') => {
+                depth -= 1;
+            }
+            _ => {}
+        }
+
         if is_mouse_button_down(MouseButton::Right) {
             let pos = mouse_position().into();
 
             end = pos;
         }
-
-        if is_key_pressed(KeyCode::L) {
-            depth += 1;
-        } else if depth > 0 && is_key_pressed(KeyCode::H) {
-            depth -= 1;
-        }
-
         draw_circle(start.x, start.y, POINT_RADIUS, COLORSCHEME.start);
         draw_circle(end.x, end.y, POINT_RADIUS, COLORSCHEME.end);
         let path = nav.find_path(
@@ -167,7 +188,7 @@ async fn main() {
             end,
             heuristics::euclidiean,
             SearchInfo {
-                agent_radius: POINT_RADIUS,
+                agent_radius: POINT_RADIUS * 2.0,
             },
         );
 
@@ -176,7 +197,7 @@ async fn main() {
             .filter(|(_, val)| val.depth() < depth)
             .for_each(|(_, val)| val.draw());
 
-        world.draw();
+        // world.draw();
 
         let portals = nav.portals();
 
@@ -258,6 +279,7 @@ impl Draw for BSPNode {
 
         let end = origin + normal * NORMAL_LEN;
         draw_arrow(origin, end, color);
+        self.faces().iter().for_each(|v| v.draw());
     }
 }
 
@@ -282,8 +304,12 @@ impl<'a> Draw for Portal<'a> {
         let b = self.face().vertices[0];
 
         draw_line_dotted(a, b, EDGE_RADIUS, COLORSCHEME.edge);
+        // if self.adjacent()[0] {
         draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.edge);
+        // }
+        // if self.adjacent()[1] {
         draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.edge);
+        // }
     }
 }
 

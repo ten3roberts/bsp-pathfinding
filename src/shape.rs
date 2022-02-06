@@ -156,7 +156,7 @@ impl Face {
         (self.vertices[0] + self.vertices[1]) / 2.0
     }
 
-    /// Returns true if `other` is completely contained wihtin self
+    /// Returns true if `other` is completely contained within self
     pub fn contains(&self, other: &Self) -> bool {
         let dir = self.dir();
 

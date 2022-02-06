@@ -67,52 +67,6 @@ impl ClippedFace {
         }
     }
 
-    /// Split the face. The first face is in front
-    pub(crate) fn split(&self, p: Vec2, normal: Vec2, double_planar: bool) -> [Self; 2] {
-        let intersection = face_intersect(self.into_tuple(), p, normal);
-        let a = (self.vertices[0] - p).dot(normal);
-
-        let front = if double_planar {
-            Side::Back
-        } else {
-            Side::Front
-        };
-
-        // a is in front
-        if a >= -TOLERANCE {
-            [
-                Self::new(
-                    [self.vertices[0], intersection.point],
-                    [self.sides[0], front],
-                    self.src,
-                    self.dst,
-                ),
-                Self::new(
-                    [intersection.point, self.vertices[1]],
-                    [Side::Back, self.sides[1]],
-                    self.src,
-                    self.dst,
-                ),
-            ]
-        } else {
-            // a is behind
-            [
-                Self::new(
-                    [intersection.point, self.vertices[1]],
-                    [front, self.sides[1]],
-                    self.src,
-                    self.dst,
-                ),
-                Self::new(
-                    [self.vertices[0], intersection.point],
-                    [self.sides[0], Side::Back],
-                    self.src,
-                    self.dst,
-                ),
-            ]
-        }
-    }
-
     /// Get the portal's src.
     pub fn src(&self) -> NodeIndex {
         self.src
