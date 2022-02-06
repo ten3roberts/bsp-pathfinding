@@ -202,8 +202,9 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // End found
         // Generate backtrace and terminate
         if current.node == end_node {
-            let mut path = backtrace(end, current.node, backtraces);
+            let mut path = backtrace(end, current.node, backtraces, info.agent_radius);
             shorten(tree, portals, &mut path, info.agent_radius);
+            resolve_clip(portals, &mut path, info.agent_radius);
             return Some(path);
         }
 
@@ -271,6 +272,7 @@ fn backtrace(
     end: Vec2,
     mut current: NodeIndex,
     backtraces: SecondaryMap<NodeIndex, Backtrace>,
+    margin: f32,
 ) -> Path {
     let mut path = Path::new(vec![WayPoint::new(end, current, None)]);
     loop {
@@ -293,6 +295,27 @@ fn backtrace(
 
     path.reverse();
     path
+}
+
+fn resolve_clip(portals: &Portals, path: &mut [WayPoint], margin: f32) {
+    if path.len() < 3 {
+        return;
+    }
+
+    let a = path[0];
+    let c = path[2];
+    let b = &mut path[1];
+
+    if let Some(portal) = b.portal {
+        let normal = portal.normal();
+        let dir = normal.perp();
+        let a_inc = (a.point - b.point).normalize().perp_dot(normal);
+        let c_inc = (c.point - b.point).normalize().perp_dot(normal);
+
+        b.point += normal * margin * -(a_inc + c_inc)
+    }
+
+    resolve_clip(portals, &mut path[1..], margin)
 }
 
 fn shorten(tree: &BSPTree, portals: &Portals, path: &mut [WayPoint], agent_radius: f32) -> bool {

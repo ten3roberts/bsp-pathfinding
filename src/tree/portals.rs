@@ -44,14 +44,14 @@ impl ClippedFace {
             Self::new(
                 [self.vertices[0], intersection.point],
                 [Side::Front, Side::Front],
-                [false, false],
+                [self.adjacent[0], false],
                 self.src,
                 self.dst,
             ),
             Self::new(
                 [intersection.point, self.vertices[1]],
                 [Side::Front, Side::Front],
-                [false, false],
+                [false, self.adjacent[1]],
                 self.src,
                 self.dst,
             ),

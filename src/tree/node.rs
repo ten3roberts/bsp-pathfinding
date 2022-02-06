@@ -245,11 +245,7 @@ impl BSPNode {
                 return;
             }
 
-            let ad = node
-                .faces
-                .iter()
-                .find(|f| f.contains_point(*intersect))
-                .is_some();
+            let ad = val.contains_point(intersect.point);
 
             if intersect.distance > 0.0 && intersect.distance < max.distance {
                 max = intersect;
@@ -261,10 +257,8 @@ impl BSPNode {
             }
         });
 
-        let face = Face::new([max.point, min.point]);
-
         let portal = ClippedFace::new(
-            face.vertices,
+            [max.point, min.point],
             [Side::Front, Side::Front],
             adjacent,
             index,
@@ -283,7 +277,10 @@ impl BSPNode {
 
         // Add the current nodes clip plane before recursing
         // result.push(portal);
-        let clipping_planes = clipping_planes.push_back(face);
+        let clipping_planes = node
+            .faces
+            .iter()
+            .fold(clipping_planes.clone(), |acc, val| acc.push_back(*val));
 
         // Clone the clipping faces since the descendants of the children will
         // also be added to the clipping planes,
