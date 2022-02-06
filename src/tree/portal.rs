@@ -39,7 +39,7 @@ impl<'a> Portal<'a> {
 
     // Returns true if the line is contained on the surface of the portal
     pub(crate) fn try_clip(&self, start: Vec2, end: Vec2, margin: f32) -> Option<Vec2> {
-        let (l, r) = self.apply_margin(margin);
+        let (l, r) = self.apply_margin(margin).into_tuple();
         let p = face_intersect((l, r), start, (end - start).perp());
 
         // let rel = (p - self.vertices[0]).dot(self.vertices[1] - self.vertices[0]);
@@ -51,7 +51,7 @@ impl<'a> Portal<'a> {
     }
 
     pub(crate) fn clip(&self, start: Vec2, end: Vec2, margin: f32) -> Vec2 {
-        let (l, r) = self.apply_margin(margin);
+        let (l, r) = self.apply_margin(margin).into_tuple();
         let p = face_intersect((l, r), start, (end - start).perp());
 
         // let rel = (p - self.vertices[0]).dot(self.vertices[1] - self.vertices[0]);
@@ -64,11 +64,11 @@ impl<'a> Portal<'a> {
         }
     }
 
-    pub fn apply_margin(&self, margin: f32) -> (Vec2, Vec2) {
+    pub fn apply_margin(&self, margin: f32) -> Face {
         let dir = self.face.dir();
-        let l = self.face.vertices[0] + margin * dir;
-        let r = self.face.vertices[1] - margin * dir;
-        (l, r)
+        let l = self.face.vertices[0] + margin * dir * self.adjacent[0] as i32 as f32;
+        let r = self.face.vertices[1] - margin * dir * self.adjacent[1] as i32 as f32;
+        Face::new([l, r])
     }
 }
 
@@ -87,6 +87,7 @@ pub struct PortalRef {
     pub(crate) src: NodeIndex,
     pub(crate) dst: NodeIndex,
     pub(crate) face: usize,
+    pub(crate) adjacent: [bool; 2],
     // Normal may be different than the face due to the normal pointing through
     // the portal
     pub(crate) normal: Vec2,
@@ -111,5 +112,10 @@ impl PortalRef {
     /// Get a mutable reference to the portal ref's normal.
     pub fn normal_mut(&mut self) -> &mut Vec2 {
         &mut self.normal
+    }
+
+    /// Get the portal ref's adjacent.
+    pub fn adjacent(&self) -> [bool; 2] {
+        self.adjacent
     }
 }

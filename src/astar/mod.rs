@@ -211,18 +211,20 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 
         // Add all edges to the open list and update backtraces
         let portals = portals.get(current.node).filter_map(|portal| {
-            if portal.face.length() < 2.0 * info.agent_radius
-                || portal.dst() == current.node
+            let face = portal.apply_margin(info.agent_radius);
+            if portal.dst() == current.node
+                || face.length() < 2.0 * info.agent_radius
                 || closed.contains(&portal.dst())
             {
                 return None;
             }
+
             assert_eq!(portal.src(), current.node);
 
             let mid = portal.face.midpoint();
 
             // Distance to each of the nodes
-            let (p1, p2) = portal.apply_margin(info.agent_radius);
+            let (p1, p2) = face.into_tuple();
             let p1_dist = (heuristic)(p1, end);
             let p2_dist = (heuristic)(p2, end);
 
@@ -275,12 +277,6 @@ fn backtrace(
         // Backtrace backwards
         let node = backtraces[current];
 
-        //         let p = if let (Some(portal), Some(prev)) = (node.portal, node.prev) {
-        //             node.point + (portal.face.normal * agent_radius)
-        //         } else {
-        //             node.point
-        //         };
-
         path.push(WayPoint::new(
             node.point,
             node.node,
@@ -307,6 +303,7 @@ fn shorten(tree: &BSPTree, portals: &Portals, path: &mut [WayPoint], agent_radiu
     let a = &path[0];
     let b = &path[1];
     let c = &path[2];
+
     if let Some(portal) = b.portal {
         let portal = portals.from_ref(portal);
         // c was directly visible from a
@@ -315,13 +312,11 @@ fn shorten(tree: &BSPTree, portals: &Portals, path: &mut [WayPoint], agent_radiu
 
             path[1].point = p;
 
-            if prev.distance_squared(p) < TOLERANCE {
-                return false;
-            }
-
             // Try to shorten the next strip.
             // If successful, retry shortening for this strip
-            if shorten(tree, portals, &mut path[1..], agent_radius) {
+            if shorten(tree, portals, &mut path[1..], agent_radius)
+                && prev.distance_squared(p) > TOLERANCE
+            {
                 shorten(tree, portals, path, agent_radius);
             }
 

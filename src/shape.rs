@@ -168,6 +168,14 @@ impl Face {
             || (b > -TOLERANCE && a > b && a * a < len + TOLERANCE)
     }
 
+    pub fn contains_point(&self, p: Vec2) -> bool {
+        let dir = self.dir();
+
+        let d = (p - self.vertices[0]).dot(dir);
+
+        d > -TOLERANCE && d < self.length() + TOLERANCE
+    }
+
     pub fn dir(&self) -> Vec2 {
         (self.vertices[1] - self.vertices[0]).normalize()
     }
@@ -254,10 +262,9 @@ pub enum Side {
 }
 
 impl Side {
-    pub fn min(&self, other: Self) -> Self {
+    pub fn min_side(&self, other: Self) -> Self {
         match (self, other) {
-            (Side::Back, _) => Side::Back,
-            (_, Side::Back) => Side::Back,
+            (Side::Back, _) | (_, Side::Back) => Side::Back,
             _ => *self,
         }
     }

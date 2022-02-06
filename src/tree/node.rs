@@ -27,9 +27,6 @@ pub struct BSPNode {
     faces: SmallVec<[Face; 2]>,
 
     depth: usize,
-    // Is true if this node contains normals which face each other. This
-    // indicates that this is both a front and a back face
-    double_planar: bool,
 }
 
 impl BSPNode {
@@ -47,8 +44,6 @@ impl BSPNode {
 
         let normal = current.normal;
 
-        let mut double_planar = false;
-
         for face in faces {
             let side = face.side_of(current.vertices[0], current.normal);
             match side {
@@ -56,7 +51,6 @@ impl BSPNode {
                 Side::Back => back.push(*face),
                 Side::Coplanar => {
                     coplanar.push(*face);
-                    double_planar = double_planar || face.normal.dot(current.normal) < 0.0
                 }
                 Side::Intersecting => {
                     // Split the line in two and repeat the process
@@ -86,7 +80,6 @@ impl BSPNode {
             origin: current.midpoint(),
             faces: coplanar,
             normal: current.normal,
-            double_planar,
             front,
             back,
             depth,
@@ -141,6 +134,23 @@ impl BSPNode {
         self.depth
     }
 
+    fn get_adjacent_side(&self, p: Vec2, other: Vec2) -> Option<Side> {
+        self.faces
+            .iter()
+            .filter_map(|f| {
+                if f.contains_point(p) {
+                    Some(if (other - f.vertices[0]).dot(f.normal()) > 0.0 {
+                        Side::Front
+                    } else {
+                        Side::Back
+                    })
+                } else {
+                    None
+                }
+            })
+            .reduce(|acc, val| acc.min_side(val))
+    }
+
     /// Clips a face by the BSP faces and returns several smaller faces
     pub fn clip(
         index: NodeIndex,
@@ -156,13 +166,18 @@ impl BSPNode {
         let b = (portal.vertices[1] - node.origin).dot(node.normal);
 
         // a is touching the plane
-        let relative_side = if node.double_planar { Side::Back } else { side };
         if a.abs() < TOLERANCE {
-            portal.sides[0] = relative_side;
+            if let Some(ad) = node.get_adjacent_side(portal.vertices[0], portal.vertices[1]) {
+                portal.adjacent[0] = true;
+                portal.sides[0] = ad;
+            }
         }
         // b is touching the plane
-        else if b.abs() < TOLERANCE {
-            portal.sides[1] = relative_side;
+        if b.abs() < TOLERANCE {
+            if let Some(ad) = node.get_adjacent_side(portal.vertices[1], portal.vertices[0]) {
+                portal.adjacent[1] = true;
+                portal.sides[1] = ad;
+            }
         }
 
         Self::clip_new(index, nodes, portal, side, root_side)
@@ -191,31 +206,14 @@ impl BSPNode {
             (Side::Front, Some(front), _) => Self::clip(front, nodes, portal, root_side),
             (Side::Back, _, Some(back)) => Self::clip(back, nodes, portal, root_side),
             (Side::Intersecting, _, _) => {
-                // Split the face at the intersection
-                // let [front, back] = if node.face.adjacent(portal.face()) {
-                // dbg!("Splittind");
-                // todo!();
-                // portal.split(node.origin, node.normal, node.double_planar)
-                // portal.split_nondestructive(node.origin, node.normal)
-                // } else {
-                let [front, back] = portal.split_nondestructive(node.origin, node.normal);
-                // };
-
-                assert_eq!(front.side_of(node.origin(), node.normal), Side::Front);
-                assert_eq!(back.side_of(node.origin(), node.normal), Side::Back);
+                let [front, back] = portal.split(node.origin, node.normal);
 
                 assert!(front.normal.dot(portal.normal) > 0.0);
                 assert!(back.normal.dot(portal.normal) > 0.0);
 
-                let mut result = Self::clip_new(index, nodes, front, Side::Front, root_side);
+                let mut result = Self::clip(index, nodes, front, root_side);
 
-                result.append(&mut Self::clip_new(
-                    index,
-                    nodes,
-                    back,
-                    Side::Back,
-                    root_side,
-                ));
+                result.append(&mut Self::clip(index, nodes, back, root_side));
                 result
             }
             _ => {
@@ -238,8 +236,7 @@ impl BSPNode {
         let node = &nodes[index];
         let dir = Vec2::new(node.normal.y, -node.normal.x);
         let mut min = Intersect::new(Vec2::ZERO, f32::MAX);
-        let mut min_side = Side::Coplanar;
-        let mut max_side = Side::Coplanar;
+        let mut adjacent = [false, false];
         let mut max = Intersect::new(Vec2::ZERO, f32::MAX);
 
         clipping_planes.iter().for_each(|val| {
@@ -248,27 +245,31 @@ impl BSPNode {
                 return;
             }
 
-            let side = if node.double_planar {
-                Side::Back
-            } else if (val.vertices[0] - node.origin()).dot(val.normal()) > 0.0 {
-                Side::Front
-            } else {
-                Side::Back
-            };
+            let ad = node
+                .faces
+                .iter()
+                .find(|f| f.contains_point(*intersect))
+                .is_some();
 
             if intersect.distance > 0.0 && intersect.distance < max.distance {
                 max = intersect;
-                max_side = side;
+                adjacent[0] = ad;
             }
             if intersect.distance < 0.0 && intersect.distance.abs() < min.distance.abs() {
                 min = intersect;
-                min_side = side;
+                adjacent[1] = ad;
             }
         });
 
         let face = Face::new([max.point, min.point]);
 
-        let portal = ClippedFace::new(face.vertices, [max_side, min_side], index, index);
+        let portal = ClippedFace::new(
+            face.vertices,
+            [Side::Front, Side::Front],
+            adjacent,
+            index,
+            index,
+        );
 
         result.extend(
             Self::clip(index, nodes, portal, Side::Front)
@@ -298,11 +299,6 @@ impl BSPNode {
 
     pub fn is_leaf(&self) -> bool {
         self.front.is_none() && self.back.is_none()
-    }
-
-    /// Get the bspnode's double planar.
-    pub fn double_planar(&self) -> bool {
-        self.double_planar
     }
 
     /// Get a reference to the bspnode's faces.

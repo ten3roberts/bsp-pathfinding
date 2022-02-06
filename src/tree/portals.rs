@@ -13,58 +13,49 @@ pub struct ClippedFace {
     face: Face,
     // Used to determine if a face is completely inside
     pub(crate) sides: [Side; 2],
+    pub(crate) adjacent: [bool; 2],
 
     pub src: NodeIndex,
     pub dst: NodeIndex,
 }
 
 impl ClippedFace {
-    pub fn new(vertices: [Vec2; 2], sides: [Side; 2], src: NodeIndex, dst: NodeIndex) -> Self {
+    pub fn new(
+        vertices: [Vec2; 2],
+        sides: [Side; 2],
+        adjacent: [bool; 2],
+        src: NodeIndex,
+        dst: NodeIndex,
+    ) -> Self {
         Self {
             face: Face::new(vertices),
             sides,
+            adjacent,
             src,
             dst,
         }
     }
 
-    pub(crate) fn split_nondestructive(&self, p: Vec2, normal: Vec2) -> [Self; 2] {
+    pub(crate) fn split(&self, p: Vec2, normal: Vec2) -> [Self; 2] {
         let intersection = face_intersect(self.into_tuple(), p, normal);
-        let a = (self.vertices[0] - p).dot(normal);
 
         // a is in front
-        if a >= -TOLERANCE {
-            [
-                Self::new(
-                    [self.vertices[0], intersection.point],
-                    [Side::Front, Side::Front],
-                    self.src,
-                    self.dst,
-                ),
-                Self::new(
-                    [intersection.point, self.vertices[1]],
-                    [Side::Front, Side::Front],
-                    self.src,
-                    self.dst,
-                ),
-            ]
-        } else {
-            // a is behind
-            [
-                Self::new(
-                    [intersection.point, self.vertices[1]],
-                    [Side::Front, Side::Front],
-                    self.src,
-                    self.dst,
-                ),
-                Self::new(
-                    [self.vertices[0], intersection.point],
-                    [Side::Front, Side::Front],
-                    self.src,
-                    self.dst,
-                ),
-            ]
-        }
+        [
+            Self::new(
+                [self.vertices[0], intersection.point],
+                [Side::Front, Side::Front],
+                [false, false],
+                self.src,
+                self.dst,
+            ),
+            Self::new(
+                [intersection.point, self.vertices[1]],
+                [Side::Front, Side::Front],
+                [false, false],
+                self.src,
+                self.dst,
+            ),
+        ]
     }
 
     /// Get the portal's src.
@@ -132,6 +123,7 @@ impl Portals {
             .push(PortalRef {
                 dst: portal.dst,
                 src: portal.src,
+                adjacent: portal.adjacent,
                 normal: -portal.normal(),
                 face,
             });
@@ -142,6 +134,7 @@ impl Portals {
             .push(PortalRef {
                 dst: portal.src,
                 src: portal.dst,
+                adjacent: portal.adjacent,
                 normal: portal.normal(),
                 face,
             });

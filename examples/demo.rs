@@ -135,11 +135,8 @@ async fn main() {
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
 
-    let mut seed: i64 = 0;
-    let mut nav = NavigationContext::new_shuffle(
-        world.iter().cloned(),
-        &mut StdRng::seed_from_u64(seed as u64),
-    );
+    let mut seed = 0;
+    let mut nav = None;
 
     let mut depth = 10;
 
@@ -152,29 +149,29 @@ async fn main() {
             start = pos;
         }
 
-        let c = get_char_pressed();
-        match c {
-            Some('r') | Some('R') => {
-                nav = NavigationContext::new_shuffle(
-                    world.iter().cloned(),
-                    &mut StdRng::seed_from_u64(seed as u64),
-                );
-                seed += if c == Some('r') {
-                    1
-                } else if depth > 0 {
-                    -1
-                } else {
-                    0
-                };
+        if let Some(c) = get_char_pressed() {
+            match c {
+                'r' => {
+                    nav = None;
+                    seed += 1
+                }
+                'R' if seed > 1 => {
+                    nav = None;
+                    seed -= 1
+                }
+                'l' => {
+                    depth += 1;
+                }
+                'h' if depth > 1 => {
+                    depth -= 1;
+                }
+                _ => {}
             }
-            Some('l') => {
-                depth += 1;
-            }
-            Some('h') => {
-                depth -= 1;
-            }
-            _ => {}
         }
+
+        let nav = nav.get_or_insert_with(|| {
+            NavigationContext::new_shuffle(world.iter().cloned(), &mut StdRng::seed_from_u64(seed))
+        });
 
         if is_mouse_button_down(MouseButton::Right) {
             let pos = mouse_position().into();
@@ -188,7 +185,7 @@ async fn main() {
             end,
             heuristics::euclidiean,
             SearchInfo {
-                agent_radius: POINT_RADIUS * 2.0,
+                agent_radius: POINT_RADIUS,
             },
         );
 
@@ -300,16 +297,15 @@ fn draw_arrow(start: Vec2, end: Vec2, color: Color) {
 
 impl<'a> Draw for Portal<'a> {
     fn draw(&self) {
-        let a = self.face().vertices[1];
-        let b = self.face().vertices[0];
+        let [a, b] = self.face().vertices;
 
         draw_line_dotted(a, b, EDGE_RADIUS, COLORSCHEME.edge);
-        // if self.adjacent()[0] {
-        draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.edge);
-        // }
-        // if self.adjacent()[1] {
-        draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.edge);
-        // }
+        if self.adjacent()[0] {
+            draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.edge);
+        }
+        if self.adjacent()[1] {
+            draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.edge);
+        }
     }
 }
 
