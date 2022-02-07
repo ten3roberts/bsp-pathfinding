@@ -5,7 +5,7 @@ use glam::Vec2;
 use slotmap::{secondary::Iter, SecondaryMap};
 use smallvec::SmallVec;
 
-use crate::{util::face_intersect, BSPTree, Face, NodeIndex, Portal, PortalRef, Side, TOLERANCE};
+use crate::{util::face_intersect, BSPTree, Face, NodeIndex, Portal, PortalRef, Side};
 
 #[derive(Copy, Debug, Clone, PartialEq)]
 #[doc(hidden)]

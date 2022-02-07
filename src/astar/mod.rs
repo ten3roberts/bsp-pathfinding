@@ -202,7 +202,7 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // End found
         // Generate backtrace and terminate
         if current.node == end_node {
-            let mut path = backtrace(end, current.node, backtraces, info.agent_radius);
+            let mut path = backtrace(end, current.node, backtraces);
             shorten(tree, portals, &mut path, info.agent_radius);
             resolve_clip(portals, &mut path, info.agent_radius);
             return Some(path);
@@ -222,14 +222,12 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
 
             assert_eq!(portal.src(), current.node);
 
-            let mid = portal.face.midpoint();
-
             // Distance to each of the nodes
             let (p1, p2) = face.into_tuple();
             let p1_dist = (heuristic)(p1, end);
             let p2_dist = (heuristic)(p2, end);
 
-            let p = if end_rel.dot(mid - current.point) > 0.0 {
+            let p = if portal.normal().dot(end_rel) > 0.0 {
                 portal.clip(current.point, end, info.agent_radius)
             } else if p1_dist < p2_dist {
                 p1
@@ -272,7 +270,6 @@ fn backtrace(
     end: Vec2,
     mut current: NodeIndex,
     backtraces: SecondaryMap<NodeIndex, Backtrace>,
-    margin: f32,
 ) -> Path {
     let mut path = Path::new(vec![WayPoint::new(end, current, None)]);
     loop {
@@ -307,12 +304,24 @@ fn resolve_clip(portals: &Portals, path: &mut [WayPoint], margin: f32) {
     let b = &mut path[1];
 
     if let Some(portal) = b.portal {
-        let normal = portal.normal();
-        let dir = normal.perp();
-        let a_inc = (a.point - b.point).normalize().perp_dot(normal);
-        let c_inc = (c.point - b.point).normalize().perp_dot(normal);
+        let portal = portals.from_ref(portal);
+        let [p, q] = portal.face.vertices;
+        if (b.point().distance(p) < margin + TOLERANCE && portal.adjacent[0])
+            || (b.point().distance(q) < margin + TOLERANCE && portal.adjacent[1])
+        {
+            let normal = portal.normal();
+            let a_inc = (a.point - b.point)
+                .normalize_or_zero()
+                .perp_dot(normal)
+                .abs();
 
-        b.point += normal * margin * -(a_inc + c_inc)
+            let c_inc = (c.point - b.point)
+                .normalize_or_zero()
+                .perp_dot(normal)
+                .abs();
+
+            b.point += normal * margin * (c_inc - a_inc)
+        }
     }
 
     resolve_clip(portals, &mut path[1..], margin)
