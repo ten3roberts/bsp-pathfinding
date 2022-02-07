@@ -61,7 +61,11 @@ impl WayPoint {
 }
 
 impl Path {
-    pub fn new(points: impl Into<SmallVec<[WayPoint; 8]>>) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn from_points(points: impl Into<SmallVec<[WayPoint; 8]>>) -> Self {
         Self {
             points: points.into(),
         }
@@ -82,24 +86,28 @@ impl Path {
 
     /// Creates a path using the euclidian path
     pub fn euclidian(start: Vec2, end: Vec2) -> Path {
-        Path::new(vec![
+        Path::from_points(vec![
             WayPoint::new(start, NodeIndex::null(), None),
             WayPoint::new(end, NodeIndex::null(), None),
         ])
     }
+
+    pub fn clear(&mut self) {
+        self.points.clear()
+    }
 }
 
 impl Deref for Path {
-    type Target = [WayPoint];
+    type Target = SmallVec<[WayPoint; 8]>;
 
     fn deref(&self) -> &Self::Target {
-        self.points.deref()
+        &self.points
     }
 }
 
 impl DerefMut for Path {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.points.deref_mut()
+        &mut self.points
     }
 }
 
@@ -170,14 +178,28 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
     end: Vec2,
     heuristic: F,
     info: SearchInfo,
+    mut path: Path,
 ) -> Option<Path> {
     let mut open = BinaryHeap::new();
     let start_node = tree.locate(start);
     let end_node = tree.locate(end);
 
-    // No path if start or end a covered
+    // No path if start or end are covered
     if start_node.covered() || end_node.covered() {
         return None;
+    }
+
+    // Find matching start node
+    let inc_start = path.iter().position(|p| p.node == start_node.index());
+
+    // New end is in the same node as old end
+    if let (Some(start), Some(last)) = (inc_start, path.last_mut()) {
+        assert_eq!(last.portal, None);
+        if last.node == end_node.index() {
+            last.point = end;
+            path.drain(0..start);
+            return Some(path);
+        }
     }
 
     let start_node = start_node.index();
@@ -202,7 +224,7 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // End found
         // Generate backtrace and terminate
         if current.node == end_node {
-            let mut path = backtrace(end, current.node, backtraces);
+            backtrace(end, current.node, backtraces, &mut path);
             shorten(tree, portals, &mut path, info.agent_radius);
             resolve_clip(portals, &mut path, info.agent_radius);
             return Some(path);
@@ -270,8 +292,10 @@ fn backtrace(
     end: Vec2,
     mut current: NodeIndex,
     backtraces: SecondaryMap<NodeIndex, Backtrace>,
-) -> Path {
-    let mut path = Path::new(vec![WayPoint::new(end, current, None)]);
+    path: &mut Path,
+) {
+    path.clear();
+    path.push(WayPoint::new(end, current, None));
     loop {
         // Backtrace backwards
         let node = backtraces[current];
@@ -291,7 +315,6 @@ fn backtrace(
     }
 
     path.reverse();
-    path
 }
 
 fn resolve_clip(portals: &Portals, path: &mut [WayPoint], margin: f32) {

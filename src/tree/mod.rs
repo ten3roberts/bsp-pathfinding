@@ -88,7 +88,7 @@ impl BSPTree {
             let rel = point - node.origin();
             let dot = rel.dot(node.normal());
 
-            let (next, covered) = if dot > 0.0 {
+            let (next, covered) = if dot >= 0.0 {
                 (node.front(), false)
             } else {
                 (node.back(), true)
@@ -141,6 +141,7 @@ impl BSPTree {
 }
 
 /// Represents the result of [crate::BSPTree::locate]
+#[derive(Clone, Debug)]
 pub struct NodePayload<'a> {
     pub index: NodeIndex,
     pub node: &'a BSPNode,

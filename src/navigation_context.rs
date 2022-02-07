@@ -76,7 +76,34 @@ impl NavigationContext {
         info: SearchInfo,
     ) -> Option<Path> {
         match &self.tree {
-            Some(tree) => astar(&tree, &self.portals, start, end, heuristic, info),
+            Some(tree) => astar(
+                &tree,
+                &self.portals,
+                start,
+                end,
+                heuristic,
+                info,
+                Path::new(),
+            ),
+            None => Some(Path::euclidian(start, end)),
+        }
+    }
+
+    /// Find a path from `start` to `end`
+    /// Returns None if no path was found.
+    /// If there are no faces in the scene, a straight path will be returned.
+    /// Uses an already allocated path to fill and will attempt to only update
+    /// parts of the path
+    pub fn find_path_inc(
+        &self,
+        start: Vec2,
+        end: Vec2,
+        heuristic: impl Fn(Vec2, Vec2) -> f32,
+        info: SearchInfo,
+        path: Path,
+    ) -> Option<Path> {
+        match &self.tree {
+            Some(tree) => astar(&tree, &self.portals, start, end, heuristic, info, path),
             None => Some(Path::euclidian(start, end)),
         }
     }
