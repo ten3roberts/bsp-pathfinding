@@ -42,4 +42,4 @@ pub use navigation_context::*;
 pub use shape::*;
 pub use tree::*;
 
-pub const TOLERANCE: f32 = 0.1;
+pub const TOLERANCE: f32 = 0.01;

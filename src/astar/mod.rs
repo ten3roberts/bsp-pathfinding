@@ -1,35 +1,20 @@
 use core::slice;
 use std::{
     collections::{BinaryHeap, HashSet},
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut, RangeBounds},
 };
 
 use glam::Vec2;
 use slotmap::{secondary::Entry, Key, SecondaryMap};
-use smallvec::SmallVec;
+use smallvec::{Drain, SmallVec};
 
 use crate::{BSPTree, NodeIndex, Portal, PortalRef, Portals, TOLERANCE};
-
-#[derive(Debug, Clone, Default)]
-pub struct Path {
-    points: SmallVec<[WayPoint; 8]>,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WayPoint {
     point: Vec2,
     node: NodeIndex,
     portal: Option<PortalRef>,
-}
-
-impl<'a> IntoIterator for &'a Path {
-    type Item = &'a WayPoint;
-
-    type IntoIter = slice::Iter<'a, WayPoint>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.points.iter()
-    }
 }
 
 impl Deref for WayPoint {
@@ -57,6 +42,21 @@ impl WayPoint {
     /// Get the way point's portal.
     pub fn portal(&self) -> Option<PortalRef> {
         self.portal
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Path {
+    points: SmallVec<[WayPoint; 8]>,
+}
+
+impl<'a> IntoIterator for &'a Path {
+    type Item = &'a WayPoint;
+
+    type IntoIter = slice::Iter<'a, WayPoint>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.points.iter()
     }
 }
 
@@ -95,10 +95,14 @@ impl Path {
     pub fn clear(&mut self) {
         self.points.clear()
     }
+
+    pub fn drain<R: RangeBounds<usize>>(&mut self, range: R) -> Drain<'_, [WayPoint; 8]> {
+        self.points.drain(range)
+    }
 }
 
 impl Deref for Path {
-    type Target = SmallVec<[WayPoint; 8]>;
+    type Target = [WayPoint];
 
     fn deref(&self) -> &Self::Target {
         &self.points
@@ -171,36 +175,40 @@ pub struct SearchInfo {
     pub agent_radius: f32,
 }
 
-pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
+pub fn astar<'a, F: Fn(Vec2, Vec2) -> f32>(
     tree: &BSPTree,
     portals: &Portals,
     start: Vec2,
     end: Vec2,
     heuristic: F,
     info: SearchInfo,
-    mut path: Path,
-) -> Option<Path> {
+    path: &'a mut Option<Path>,
+) -> Option<&'a mut Path> {
     let mut open = BinaryHeap::new();
     let start_node = tree.locate(start);
     let end_node = tree.locate(end);
 
-    // No path if start or end are covered
-    if start_node.covered() || end_node.covered() {
-        return None;
-    }
+    // // No path if start or end are covered
+    // if start_node.covered() || end_node.covered() {
+    //     return None;
+    // }
 
     // Find matching start node
-    let inc_start = path.iter().position(|p| p.node == start_node.index());
+    // if let Some(p) = path {
+    //     let inc_start = p.iter().position(|p| p.node == start_node.index());
 
-    // New end is in the same node as old end
-    if let (Some(start), Some(last)) = (inc_start, path.last_mut()) {
-        assert_eq!(last.portal, None);
-        if last.node == end_node.index() {
-            last.point = end;
-            path.drain(0..start);
-            return Some(path);
-        }
-    }
+    //     // New end is in the same node as old end
+    //     if let (Some(start_idx), Some(last)) = (inc_start, p.last_mut()) {
+    //         assert_eq!(last.portal, None);
+    //         if last.node == end_node.index() {
+    //             last.point = end;
+    //             p.drain(0..start_idx);
+    //             p[0].point = start;
+
+    //             return path.as_mut();
+    //         }
+    //     }
+    // }
 
     let start_node = start_node.index();
     let end_node = end_node.index();
@@ -224,9 +232,12 @@ pub fn astar<F: Fn(Vec2, Vec2) -> f32>(
         // End found
         // Generate backtrace and terminate
         if current.node == end_node {
-            backtrace(end, current.node, backtraces, &mut path);
-            shorten(tree, portals, &mut path, info.agent_radius);
-            resolve_clip(portals, &mut path, info.agent_radius);
+            let path = path.get_or_insert_with(|| Default::default());
+
+            backtrace(end, current.node, backtraces, path);
+            shorten(tree, portals, path, info.agent_radius);
+            resolve_clip(portals, path, info.agent_radius);
+
             return Some(path);
         }
 
@@ -296,15 +307,20 @@ fn backtrace(
 ) {
     path.clear();
     path.push(WayPoint::new(end, current, None));
+    let mut prev = end;
     loop {
         // Backtrace backwards
         let node = backtraces[current];
 
-        path.push(WayPoint::new(
-            node.point,
-            node.node,
-            node.portal.as_ref().map(Portal::portal_ref),
-        ));
+        if path.len() < 2 || prev.distance_squared(node.point) > TOLERANCE {
+            path.push(WayPoint::new(
+                node.point,
+                node.node,
+                node.portal.as_ref().map(Portal::portal_ref),
+            ));
+        }
+
+        prev = node.point;
 
         // Continue up the backtrace
         if let Some(prev) = node.prev {

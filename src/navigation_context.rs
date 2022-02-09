@@ -76,16 +76,12 @@ impl NavigationContext {
         heuristic: impl Fn(Vec2, Vec2) -> f32,
         info: SearchInfo,
     ) -> Option<Path> {
+        let mut path = None;
         match &self.tree {
-            Some(tree) => astar(
-                &tree,
-                &self.portals,
-                start,
-                end,
-                heuristic,
-                info,
-                Path::new(),
-            ),
+            Some(tree) => {
+                astar(&tree, &self.portals, start, end, heuristic, info, &mut path);
+                path
+            }
             None => Some(Path::euclidian(start, end)),
         }
     }
@@ -95,17 +91,20 @@ impl NavigationContext {
     /// If there are no faces in the scene, a straight path will be returned.
     /// Uses an already allocated path to fill and will attempt to only update
     /// parts of the path
-    pub fn find_path_inc(
+    pub fn find_path_inc<'a>(
         &self,
         start: Vec2,
         end: Vec2,
         heuristic: impl Fn(Vec2, Vec2) -> f32,
         info: SearchInfo,
-        path: Path,
-    ) -> Option<Path> {
+        path: &'a mut Option<Path>,
+    ) -> Option<&'a mut Path> {
         match &self.tree {
             Some(tree) => astar(&tree, &self.portals, start, end, heuristic, info, path),
-            None => Some(Path::euclidian(start, end)),
+            None => {
+                *path = Some(Path::euclidian(start, end));
+                path.as_mut()
+            }
         }
     }
 }

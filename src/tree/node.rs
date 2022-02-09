@@ -271,7 +271,7 @@ impl BSPNode {
                 .filter(|val| {
                     val.src != val.dst
                         && val.sides == [Side::Front; 2]
-                        && !node.faces.iter().any(|face| face.contains(val))
+                        && !node.faces.iter().any(|face| face.overlaps(val))
                 }),
         );
 

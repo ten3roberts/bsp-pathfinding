@@ -156,16 +156,28 @@ impl Face {
         (self.vertices[0] + self.vertices[1]) / 2.0
     }
 
-    /// Returns true if `other` is completely contained within self
-    pub fn contains(&self, other: &Self) -> bool {
+    /// Returns true if `other` overlaps self
+    pub fn overlaps(&self, other: &Self) -> bool {
         let dir = self.dir();
 
-        let a = (other.vertices[0] - self.vertices[0]).dot(dir);
-        let b = (other.vertices[1] - self.vertices[0]).dot(dir);
+        let p = (self.vertices[0]).dot(dir);
+        let q = (self.vertices[1]).dot(dir);
+        let a = (other.vertices[0]).dot(dir);
+        let b = (other.vertices[1]).dot(dir);
 
-        let len = self.length_squared();
-        (a > -TOLERANCE && b > a && b * b < len + TOLERANCE)
-            || (b > -TOLERANCE && a > b && a * a < len + TOLERANCE)
+        // a -- b in the direction of self
+        let (a, b) = if dir.dot(other.dir()) > 0.0 {
+            (a, b)
+        } else {
+            (b, a)
+        };
+
+        let la = q - a;
+        let lb = b - p;
+
+        let overlap = la.min(lb);
+
+        overlap > TOLERANCE
     }
 
     pub fn contains_point(&self, p: Vec2) -> bool {

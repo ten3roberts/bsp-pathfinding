@@ -130,7 +130,8 @@ fn spawn_scene_2() -> Vec<Face> {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let world = spawn_scene_2();
+    let scenes = [spawn_scene_1(), spawn_scene_2()];
+    let mut world = &scenes[0];
 
     let mut start = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
     let mut end = Vec2::new(screen_width() / 2.0, screen_height() * 0.2);
@@ -144,25 +145,36 @@ async fn main() {
         clear_background(COLORSCHEME.background);
 
         if is_mouse_button_down(MouseButton::Left) {
-            let pos = mouse_position().into();
+            let pos: Vec2 = mouse_position().into();
 
-            start = pos;
+            if pos.distance(end) < pos.distance(start) {
+                end = pos
+            } else {
+                start = pos;
+            }
         }
 
         if let Some(c) = get_char_pressed() {
             match c {
+                '1'..='9' => {
+                    let num = c as usize - '1' as usize;
+                    if num < scenes.len() {
+                        world = &scenes[num];
+                        nav = None;
+                    }
+                }
                 'r' => {
                     nav = None;
                     seed += 1
                 }
-                'R' if seed > 1 => {
+                'R' if seed > 0 => {
                     nav = None;
                     seed -= 1
                 }
                 'l' => {
                     depth += 1;
                 }
-                'h' if depth > 1 => {
+                'h' if depth > 0 => {
                     depth -= 1;
                 }
                 _ => {}
@@ -173,13 +185,11 @@ async fn main() {
             NavigationContext::new_shuffle(world.iter().cloned(), &mut StdRng::seed_from_u64(seed))
         });
 
-        if is_mouse_button_down(MouseButton::Right) {
-            let pos = mouse_position().into();
+        start += nav.locate(start).unwrap().depth;
 
-            end = pos;
-        }
         draw_circle(start.x, start.y, POINT_RADIUS, COLORSCHEME.start);
         draw_circle(end.x, end.y, POINT_RADIUS, COLORSCHEME.end);
+
         let path = nav.find_path(
             start,
             end,
@@ -191,7 +201,7 @@ async fn main() {
 
         let tree = nav.tree().unwrap();
         tree.descendants()
-            .filter(|(_, val)| val.depth() < depth)
+            .filter(|(_, val)| val.depth().max(10) <= depth)
             .for_each(|(_, val)| val.draw());
 
         // world.draw();
@@ -223,8 +233,8 @@ const POINT_RADIUS: f32 = 10.0;
 const VERTEX_RADIUS: f32 = 6.0;
 const EDGE_RADIUS: f32 = 4.0;
 const PATH_THICKNESS: f32 = 4.0;
-const NORMAL_LEN: f32 = 32.0;
-const ARROW_LEN: f32 = 8.0;
+const NORMAL_LEN: f32 = 16.0;
+const ARROW_LEN: f32 = 4.0;
 
 trait Draw {
     fn draw(&self);
@@ -236,8 +246,6 @@ impl Draw for Face {
         let b = self.vertices[0];
 
         draw_line(a.x, a.y, b.x, b.y, THICKNESS, COLORSCHEME.shape);
-        // draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.shape);
-        // draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.shape);
     }
 }
 
@@ -269,13 +277,15 @@ impl Draw for BSPTree {
 
 impl Draw for BSPNode {
     fn draw(&self) {
-        let normal = self.normal();
-        let origin = self.origin();
-
         let color = (COLORSCHEME.bsp_plane)(self.depth());
 
-        let end = origin + normal * NORMAL_LEN;
-        draw_arrow(origin, end, color);
+        for face in self.faces() {
+            let origin = face.midpoint();
+            let normal = face.normal();
+            let end = origin + normal * NORMAL_LEN;
+            draw_arrow(origin, end, color);
+            face.draw();
+        }
         self.faces().iter().for_each(|v| v.draw());
     }
 }
@@ -300,12 +310,6 @@ impl<'a> Draw for Portal<'a> {
         let [a, b] = self.face().vertices;
 
         draw_line_dotted(a, b, EDGE_RADIUS, COLORSCHEME.edge);
-        if self.adjacent()[0] {
-            draw_circle(a.x, a.y, VERTEX_RADIUS, COLORSCHEME.edge);
-        }
-        if self.adjacent()[1] {
-            draw_circle(b.x, b.y, VERTEX_RADIUS, COLORSCHEME.edge);
-        }
     }
 }
 
