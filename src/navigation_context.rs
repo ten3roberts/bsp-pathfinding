@@ -3,6 +3,7 @@ use crate::{
     BSPNode, BSPTree, NodeIndex, NodePayload, PortalIter,
 };
 use glam::Vec2;
+use itertools::Itertools;
 use rand::Rng;
 
 use crate::{Face, Portals};
@@ -18,7 +19,7 @@ pub struct NavigationContext {
 impl NavigationContext {
     /// Creates a new navigation context
     pub fn new(faces: impl IntoIterator<Item = Face>) -> Self {
-        let tree = BSPTree::new(faces.into_iter());
+        let tree = BSPTree::new(faces.into_iter().collect_vec());
         let mut portals = Portals::new();
         if let Some(tree) = tree.as_ref() {
             portals.generate(&tree);

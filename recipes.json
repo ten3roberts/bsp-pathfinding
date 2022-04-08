@@ -1,0 +1,8 @@
+{
+  "run-demo": {
+    "cmd": "cargo run --example demo"
+  },
+  "run-layered": {
+    "cmd": "cargo run --example layered"
+  }
+}

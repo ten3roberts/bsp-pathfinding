@@ -33,9 +33,7 @@ pub struct BSPTree {
 impl BSPTree {
     /// Constructs a new tree.
     /// Returns None if there are not faces, and root construction was not possible
-    pub fn new(faces: impl Iterator<Item = Face>) -> Option<Self> {
-        let faces: Vec<_> = faces.collect();
-
+    pub fn new(faces: Vec<Face>) -> Option<Self> {
         Self::new_inner(faces)
     }
 

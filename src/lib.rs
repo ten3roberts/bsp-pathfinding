@@ -32,14 +32,16 @@
 //!
 pub mod astar;
 pub mod heuristics;
+mod layered_context;
 mod navigation_context;
 mod shape;
 mod tree;
 mod util;
 
 pub use astar::*;
+pub use layered_context::*;
 pub use navigation_context::*;
 pub use shape::*;
 pub use tree::*;
 
-pub const TOLERANCE: f32 = 0.01;
+pub const TOLERANCE: f32 = 0.1;

@@ -56,16 +56,25 @@ impl BSPNode {
                     // Split the line in two and repeat the process
                     let intersect = face_intersect(face.into_tuple(), p, normal);
 
-                    let [a, b] = face.split(intersect.point, normal);
+                    let split = face.split(intersect.point, normal);
 
-                    assert_eq!(a.side_of(p, normal), Side::Front);
-                    assert_eq!(b.side_of(p, normal), Side::Back);
+                    for f in split {
+                        match f.side_of(p, normal) {
+                            Side::Front => front.push(f),
+                            Side::Back => back.push(f),
+                            Side::Coplanar => coplanar.push(f),
+                            Side::Intersecting => {}
+                        }
+                    }
 
-                    assert!(a.normal.dot(face.normal) > 0.0);
-                    assert!(b.normal.dot(face.normal) > 0.0);
+                    // assert_eq!(a.side_of(p, normal), Side::Front);
+                    // assert_eq!(b.side_of(p, normal), Side::Back);
 
-                    front.push(a);
-                    back.push(b)
+                    // assert!(a.normal.dot(face.normal) > 0.0);
+                    // assert!(b.normal.dot(face.normal) > 0.0);
+
+                    // front.push(a);
+                    // back.push(b)
                 }
             }
         }
