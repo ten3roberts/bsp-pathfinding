@@ -45,7 +45,7 @@ impl LayeredNavigationContext {
         let mut slice = &self.layers[..];
         loop {
             let i = slice.len() / 2;
-            let mid = &slice[i];
+            let mid = slice.get(i)?;
 
             if slice.len() == 1 {
                 return Some(mid);
